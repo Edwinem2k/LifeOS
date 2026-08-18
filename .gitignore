@@ -6,3 +6,4 @@ supabase/.branches/
 *.log
 dist/
 .next/
+.superpowers/
