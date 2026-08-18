@@ -5,6 +5,7 @@ import {
   createProject,
   updateProject,
   archiveProject,
+  reorderProjects,
 } from "@/services/projects";
 
 export function useProjects(filters?: { status?: string; area?: string }) {
@@ -46,6 +47,14 @@ export function useArchiveProject() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: archiveProject,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+  });
+}
+
+export function useReorderProjects() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: reorderProjects,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
   });
 }

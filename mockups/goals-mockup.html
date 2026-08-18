@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LifeOS — Goals Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #faf8f4;
+    --card: #f2ede5;
+    --elevated: #ffffff;
+    --border: #e2ddd4;
+    --text-primary: #1a1816;
+    --text-secondary: #6b6560;
+    --text-muted: #9e9890;
+    --accent: #3b82f6;
+
+    /* Area colors */
+    --area-work: #3b82f6;
+    --area-health: #22c55e;
+    --area-money: #eab308;
+    --area-growth: #a855f7;
+    --area-relationships: #ec4899;
+    --area-play: #f97316;
+    --area-environment: #14b8a6;
+
+    /* Status */
+    --done: #22c55e;
+    --in-progress: #3b82f6;
+    --at-risk: #f59e0b;
+    --not-started: #d1d5db;
+
+    --font-body: 'DM Sans', sans-serif;
+    --font-display: 'DM Serif Display', serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ─── Nav ─── */
+  .nav {
+    border-bottom: 1px solid var(--border);
+    background: var(--elevated);
+    padding: 0 2rem;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .nav-logo svg { width: 22px; height: 22px; }
+  .nav-logo span {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    letter-spacing: -0.02em;
+  }
+  .nav-links {
+    display: flex;
+    gap: 0.25rem;
+    margin-left: 1.5rem;
+  }
+  .nav-links a {
+    text-decoration: none;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    padding: 0.375rem 0.75rem;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .nav-links a:hover { color: var(--text-primary); background: var(--card); }
+  .nav-links a.active { color: var(--text-primary); background: var(--card); }
+
+  /* ─── Layout ─── */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 2rem 4rem;
+  }
+
+  /* ─── Header ─── */
+  .page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+  }
+  .page-header h1 {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+  }
+  .page-header .subtitle {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+  }
+  .horizon-tabs {
+    display: flex;
+    gap: 0.25rem;
+    background: var(--card);
+    border-radius: 6px;
+    padding: 3px;
+  }
+  .horizon-tabs button {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.375rem 0.875rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.15s;
+  }
+  .horizon-tabs button:hover { color: var(--text-primary); }
+  .horizon-tabs button.active {
+    background: var(--elevated);
+    color: var(--text-primary);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  /* ─── Overall Progress Strip ─── */
+  .overall-strip {
+    display: flex;
+    gap: 1px;
+    background: var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 2.5rem;
+  }
+  .overall-strip-item {
+    flex: 1;
+    background: var(--elevated);
+    padding: 1rem 1.25rem;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .overall-strip-item:hover { background: var(--card); }
+  .overall-strip-item:first-child { border-radius: 8px 0 0 8px; }
+  .overall-strip-item:last-child { border-radius: 0 8px 8px 0; }
+  .overall-strip-item .area-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 0.375rem;
+    vertical-align: middle;
+  }
+  .overall-strip-item .area-name {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+  }
+  .overall-strip-item .area-pct {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-top: 0.25rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .overall-strip-item .area-bar {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--card);
+    margin-top: 0.5rem;
+    overflow: hidden;
+  }
+  .overall-strip-item .area-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+
+  /* ─── Area Section ─── */
+  .area-section {
+    margin-bottom: 1.5rem;
+  }
+  .area-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .area-header .color-bar {
+    width: 4px;
+    height: 24px;
+    border-radius: 2px;
+  }
+  .area-header h2 {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 400;
+    flex: 1;
+  }
+  .area-header .area-summary {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .area-header .chevron {
+    color: var(--text-muted);
+    transition: transform 0.2s;
+  }
+
+  /* ─── Goal Card ─── */
+  .goal-card {
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+    transition: box-shadow 0.15s;
+  }
+  .goal-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+
+  .goal-main {
+    display: flex;
+    align-items: center;
+    padding: 0.875rem 1.25rem;
+    gap: 1rem;
+    cursor: pointer;
+  }
+
+  /* Progress ring */
+  .progress-ring {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+  }
+  .progress-ring svg {
+    width: 40px;
+    height: 40px;
+    transform: rotate(-90deg);
+  }
+  .progress-ring .ring-bg {
+    fill: none;
+    stroke: var(--card);
+    stroke-width: 3.5;
+  }
+  .progress-ring .ring-fill {
+    fill: none;
+    stroke-width: 3.5;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.8s ease;
+  }
+  .progress-ring .ring-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.625rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .goal-info { flex: 1; min-width: 0; }
+  .goal-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.1875rem;
+  }
+  .goal-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+  }
+  .goal-meta .metric {
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .goal-quarter-segments {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .q-seg {
+    width: 28px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--not-started);
+    position: relative;
+  }
+  .q-seg.done { background: var(--done); }
+  .q-seg.in-progress { background: var(--in-progress); }
+  .q-seg.at-risk { background: var(--at-risk); }
+  .q-label {
+    font-size: 0.5625rem;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 2px;
+  }
+
+  .goal-status-pill {
+    font-size: 0.625rem;
+    font-weight: 600;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 3px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .pill-done { background: #dcfce7; color: #166534; }
+  .pill-in-progress { background: #dbeafe; color: #1e40af; }
+  .pill-on-track { background: #dcfce7; color: #166534; }
+  .pill-at-risk { background: #fef3c7; color: #92400e; }
+  .pill-not-started { background: #f3f4f6; color: #6b7280; }
+
+  /* ─── Key Results (nested) ─── */
+  .key-results {
+    border-top: 1px solid var(--border);
+    background: #f5f5f4;
+  }
+  .kr-item {
+    display: flex;
+    align-items: center;
+    padding: 0.625rem 1.25rem 0.625rem 4.25rem;
+    gap: 0.75rem;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+    font-size: 0.8125rem;
+  }
+  .kr-item:last-child { border-bottom: none; }
+
+  .kr-check {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .kr-check.done {
+    background: var(--done);
+    border-color: var(--done);
+  }
+  .kr-check.done svg { display: block; }
+  .kr-check svg { display: none; }
+  .kr-check.partial {
+    border-color: var(--in-progress);
+  }
+
+  .kr-title {
+    flex: 1;
+    color: var(--text-primary);
+  }
+  .kr-title.completed {
+    text-decoration: line-through;
+    color: var(--text-muted);
+  }
+
+  .kr-progress-bar {
+    width: 80px;
+    height: 4px;
+    background: #e5e5e4;
+    border-radius: 2px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .kr-progress-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+  }
+
+  .kr-value {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 56px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kr-links {
+    display: flex;
+    gap: 0.375rem;
+    flex-shrink: 0;
+  }
+  .kr-link-tag {
+    font-size: 0.5625rem;
+    font-weight: 500;
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    background: var(--card);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .kr-link-tag:hover {
+    background: var(--elevated);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .kr-link-tag .link-icon {
+    font-size: 0.5rem;
+    margin-right: 0.1875rem;
+    opacity: 0.6;
+  }
+
+  /* ─── Quarterly Review Card ─── */
+  .quarterly-review {
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 2.5rem;
+  }
+  .qr-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .qr-header h3 {
+    font-family: var(--font-display);
+    font-size: 1rem;
+  }
+  .qr-header .qr-date {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .qr-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+  }
+  .qr-quarter {
+    background: var(--page);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    text-align: center;
+    position: relative;
+  }
+  .qr-quarter.current {
+    border-color: var(--accent);
+    background: #f8faff;
+  }
+  .qr-quarter.current::after {
+    content: 'CURRENT';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.5625rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    background: var(--elevated);
+    padding: 0 0.5rem;
+  }
+  .qr-quarter .q-name {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+  .qr-quarter .q-score {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+  .qr-quarter .q-detail {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+  }
+  .qr-quarter .q-mini-bar {
+    height: 3px;
+    background: var(--card);
+    border-radius: 2px;
+    margin-top: 0.625rem;
+    overflow: hidden;
+  }
+  .qr-quarter .q-mini-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+  }
+
+  /* ─── Add Goal ─── */
+  .add-goal-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    border-radius: 6px;
+    border: 1px dashed var(--border);
+    margin-top: 0.375rem;
+    transition: all 0.15s;
+  }
+  .add-goal-row:hover {
+    background: var(--elevated);
+    color: var(--text-secondary);
+    border-color: var(--text-muted);
+  }
+
+  /* ─── Utility ─── */
+  .fade-in { animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-logo">
+    <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="5">
+      <polygon points="50,5 5,90 95,90" />
+      <circle cx="50" cy="58" r="18" />
+      <line x1="50" y1="5" x2="50" y2="90" />
+    </svg>
+    <span>LifeOS</span>
+  </div>
+  <div class="nav-links">
+    <a href="#">Today</a>
+    <a href="#">Tasks</a>
+    <a href="#">Projects</a>
+    <a href="#" class="active">Goals</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="page-header fade-in">
+    <div>
+      <h1>2026 Goals</h1>
+      <p class="subtitle">Set in January · Next review: 1 Oct 2026</p>
+    </div>
+    <div class="horizon-tabs">
+      <button class="active">Annual</button>
+      <button>Q1</button>
+      <button>Q2</button>
+      <button>Q3 ←</button>
+      <button>Q4</button>
+    </div>
+  </div>
+
+  <!-- Overall Progress Strip -->
+  <div class="overall-strip fade-in">
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-work)"></span>Work</div>
+      <div class="area-pct">68%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:68%;background:var(--area-work)"></div></div>
+    </div>
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-health)"></span>Health</div>
+      <div class="area-pct">45%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:45%;background:var(--area-health)"></div></div>
+    </div>
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-money)"></span>Money</div>
+      <div class="area-pct">72%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:72%;background:var(--area-money)"></div></div>
+    </div>
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-growth)"></span>Growth</div>
+      <div class="area-pct">58%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:58%;background:var(--area-growth)"></div></div>
+    </div>
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-relationships)"></span>Relationships</div>
+      <div class="area-pct">40%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:40%;background:var(--area-relationships)"></div></div>
+    </div>
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-play)"></span>Play</div>
+      <div class="area-pct">55%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:55%;background:var(--area-play)"></div></div>
+    </div>
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-environment)"></span>Environment</div>
+      <div class="area-pct">82%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:82%;background:var(--area-environment)"></div></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ WORK ═══════════════════ -->
+  <div class="area-section fade-in">
+    <div class="area-header">
+      <div class="color-bar" style="background:var(--area-work)"></div>
+      <h2>Work</h2>
+      <span class="area-summary">3 goals · 68% avg</span>
+      <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+    </div>
+
+    <!-- Goal 1: LifeOS -->
+    <div class="goal-card">
+      <div class="goal-main">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16" />
+            <circle class="ring-fill" cx="20" cy="20" r="16"
+              style="stroke:var(--area-work);stroke-dasharray:100.53;stroke-dashoffset:32.17" />
+          </svg>
+          <span class="ring-text">68%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Ship LifeOS to daily use</div>
+          <div class="goal-meta">
+            <span class="metric">6 / 8 key results</span>
+            <span>Due: Dec 31</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="goal-quarter-segments">
+            <div class="q-seg done"></div>
+            <div class="q-seg done"></div>
+            <div class="q-seg in-progress"></div>
+            <div class="q-seg"></div>
+          </div>
+          <div style="display:flex;gap:3px">
+            <span class="q-label" style="width:28px">Q1</span>
+            <span class="q-label" style="width:28px">Q2</span>
+            <span class="q-label" style="width:28px">Q3</span>
+            <span class="q-label" style="width:28px">Q4</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-in-progress">In Progress</span>
+      </div>
+      <div class="key-results">
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Build core task management UI</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+          <div class="kr-links">
+            <span class="kr-link-tag"><span class="link-icon">◆</span> LifeOS Build</span>
+          </div>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Set up Supabase + auth + RLS</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+          <div class="kr-links">
+            <span class="kr-link-tag"><span class="link-icon">◆</span> LifeOS Build</span>
+          </div>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Projects + kanban views working</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Goals page designed + functional</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check partial"></div>
+          <span class="kr-title">Deploy to Vercel + custom domain</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:40%;background:var(--in-progress)"></div></div>
+          <span class="kr-value">40%</span>
+          <div class="kr-links">
+            <span class="kr-link-tag"><span class="link-icon">☐</span> Deploy to Vercel</span>
+          </div>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Migrate all Notion data</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check"></div>
+          <span class="kr-title">Use LifeOS daily for 30 consecutive days</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:0%;background:var(--not-started)"></div></div>
+          <span class="kr-value">0 / 30</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">MCP integrations (Shopify, Gmail, Calendar)</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Goal 2: Consulting -->
+    <div class="goal-card">
+      <div class="goal-main">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16" />
+            <circle class="ring-fill" cx="20" cy="20" r="16"
+              style="stroke:var(--area-work);stroke-dasharray:100.53;stroke-dashoffset:60.32" />
+          </svg>
+          <span class="ring-text">40%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Land 3 consulting clients</div>
+          <div class="goal-meta">
+            <span class="metric">1 / 3 clients</span>
+            <span>Due: Dec 31</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="goal-quarter-segments">
+            <div class="q-seg done"></div>
+            <div class="q-seg at-risk"></div>
+            <div class="q-seg"></div>
+            <div class="q-seg"></div>
+          </div>
+          <div style="display:flex;gap:3px">
+            <span class="q-label" style="width:28px">Q1</span>
+            <span class="q-label" style="width:28px">Q2</span>
+            <span class="q-label" style="width:28px">Q3</span>
+            <span class="q-label" style="width:28px">Q4</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-at-risk">At Risk</span>
+      </div>
+      <div class="key-results">
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Portfolio site live with case studies</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check partial"></div>
+          <span class="kr-title">Generate 10 warm leads via LinkedIn</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:30%;background:var(--at-risk)"></div></div>
+          <span class="kr-value">3 / 10</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check partial"></div>
+          <span class="kr-title">Close first paying engagement</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:60%;background:var(--in-progress)"></div></div>
+          <span class="kr-value">In talks</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Goal 3: PIB -->
+    <div class="goal-card">
+      <div class="goal-main">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16" />
+            <circle class="ring-fill" cx="20" cy="20" r="16"
+              style="stroke:var(--area-work);stroke-dasharray:100.53;stroke-dashoffset:14.07" />
+          </svg>
+          <span class="ring-text">86%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Grow Piglet in Bed UK revenue 20%</div>
+          <div class="goal-meta">
+            <span class="metric">£186k / £220k</span>
+            <span>Due: Dec 31</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="goal-quarter-segments">
+            <div class="q-seg done"></div>
+            <div class="q-seg done"></div>
+            <div class="q-seg in-progress"></div>
+            <div class="q-seg"></div>
+          </div>
+          <div style="display:flex;gap:3px">
+            <span class="q-label" style="width:28px">Q1</span>
+            <span class="q-label" style="width:28px">Q2</span>
+            <span class="q-label" style="width:28px">Q3</span>
+            <span class="q-label" style="width:28px">Q4</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-on-track">On Track</span>
+      </div>
+      <div class="key-results">
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Complete SEO audit + implement top 20 fixes</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+          <div class="kr-links">
+            <span class="kr-link-tag"><span class="link-icon">◆</span> PIB SEO</span>
+          </div>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Launch summer campaign</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check partial"></div>
+          <span class="kr-title">Hit £55k Q3 revenue target</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:65%;background:var(--in-progress)"></div></div>
+          <span class="kr-value">£36k / £55k</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ HEALTH ═══════════════════ -->
+  <div class="area-section fade-in">
+    <div class="area-header">
+      <div class="color-bar" style="background:var(--area-health)"></div>
+      <h2>Health</h2>
+      <span class="area-summary">2 goals · 45% avg</span>
+      <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16" />
+            <circle class="ring-fill" cx="20" cy="20" r="16"
+              style="stroke:var(--area-health);stroke-dasharray:100.53;stroke-dashoffset:50.27" />
+          </svg>
+          <span class="ring-text">50%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Run a half marathon</div>
+          <div class="goal-meta">
+            <span class="metric">12 / 21 km longest run</span>
+            <span>Due: Nov 15</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="goal-quarter-segments">
+            <div class="q-seg done"></div>
+            <div class="q-seg in-progress"></div>
+            <div class="q-seg"></div>
+            <div class="q-seg"></div>
+          </div>
+          <div style="display:flex;gap:3px">
+            <span class="q-label" style="width:28px">Q1</span>
+            <span class="q-label" style="width:28px">Q2</span>
+            <span class="q-label" style="width:28px">Q3</span>
+            <span class="q-label" style="width:28px">Q4</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-in-progress">In Progress</span>
+      </div>
+      <div class="key-results">
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Run 3x per week for 8 weeks straight</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">8 / 8 wks</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check partial"></div>
+          <span class="kr-title">Complete a 15km training run</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:0%;background:var(--not-started)"></div></div>
+          <span class="kr-value">Not yet</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check"></div>
+          <span class="kr-title">Register + complete Lisbon half marathon</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:0%;background:var(--not-started)"></div></div>
+          <span class="kr-value">Nov 15</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16" />
+            <circle class="ring-fill" cx="20" cy="20" r="16"
+              style="stroke:var(--area-health);stroke-dasharray:100.53;stroke-dashoffset:60.32" />
+          </svg>
+          <span class="ring-text">40%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Reach 78kg and maintain</div>
+          <div class="goal-meta">
+            <span class="metric">82 → 78 kg (now: 80.5)</span>
+            <span>Due: Sep 30</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="goal-quarter-segments">
+            <div class="q-seg in-progress"></div>
+            <div class="q-seg in-progress"></div>
+            <div class="q-seg"></div>
+            <div class="q-seg"></div>
+          </div>
+          <div style="display:flex;gap:3px">
+            <span class="q-label" style="width:28px">Q1</span>
+            <span class="q-label" style="width:28px">Q2</span>
+            <span class="q-label" style="width:28px">Q3</span>
+            <span class="q-label" style="width:28px">Q4</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-in-progress">In Progress</span>
+      </div>
+      <div class="key-results">
+        <div class="kr-item">
+          <div class="kr-check partial"></div>
+          <span class="kr-title">Track calories 5 days/week for 12 weeks</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:60%;background:var(--in-progress)"></div></div>
+          <span class="kr-value">7 / 12 wks</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check partial"></div>
+          <span class="kr-title">Weigh in weekly (track in spreadsheet)</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:80%;background:var(--done)"></div></div>
+          <span class="kr-value">28 / 35</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ MONEY ═══════════════════ -->
+  <div class="area-section fade-in">
+    <div class="area-header">
+      <div class="color-bar" style="background:var(--area-money)"></div>
+      <h2>Money</h2>
+      <span class="area-summary">2 goals · 72% avg</span>
+      <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16" />
+            <circle class="ring-fill" cx="20" cy="20" r="16"
+              style="stroke:var(--area-money);stroke-dasharray:100.53;stroke-dashoffset:15.08" />
+          </svg>
+          <span class="ring-text">85%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Build 6-month emergency fund</div>
+          <div class="goal-meta">
+            <span class="metric">€12,750 / €15,000</span>
+            <span>Due: Dec 31</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="goal-quarter-segments">
+            <div class="q-seg done"></div>
+            <div class="q-seg done"></div>
+            <div class="q-seg in-progress"></div>
+            <div class="q-seg"></div>
+          </div>
+          <div style="display:flex;gap:3px">
+            <span class="q-label" style="width:28px">Q1</span>
+            <span class="q-label" style="width:28px">Q2</span>
+            <span class="q-label" style="width:28px">Q3</span>
+            <span class="q-label" style="width:28px">Q4</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-on-track">On Track</span>
+      </div>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16" />
+            <circle class="ring-fill" cx="20" cy="20" r="16"
+              style="stroke:var(--area-money);stroke-dasharray:100.53;stroke-dashoffset:40.21" />
+          </svg>
+          <span class="ring-text">60%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Set up Portuguese tax structure</div>
+          <div class="goal-meta">
+            <span class="metric">4 / 6 steps done</span>
+            <span>Due: Mar 31 (overdue)</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="goal-quarter-segments">
+            <div class="q-seg at-risk"></div>
+            <div class="q-seg at-risk"></div>
+            <div class="q-seg"></div>
+            <div class="q-seg"></div>
+          </div>
+          <div style="display:flex;gap:3px">
+            <span class="q-label" style="width:28px">Q1</span>
+            <span class="q-label" style="width:28px">Q2</span>
+            <span class="q-label" style="width:28px">Q3</span>
+            <span class="q-label" style="width:28px">Q4</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-at-risk">At Risk</span>
+      </div>
+      <div class="key-results">
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Get NIF number</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+          <div class="kr-links">
+            <span class="kr-link-tag"><span class="link-icon">☐</span> NIF application</span>
+          </div>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Open PT bank account</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Register as sole trader (Empresário em Nome Individual)</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Hire accountant</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check"></div>
+          <span class="kr-title">File first quarterly IVA return</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:0%;background:var(--not-started)"></div></div>
+          <span class="kr-value">0%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check"></div>
+          <span class="kr-title">Confirm NHR/tax residency status</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:0%;background:var(--not-started)"></div></div>
+          <span class="kr-value">0%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ GROWTH ═══════════════════ -->
+  <div class="area-section fade-in">
+    <div class="area-header">
+      <div class="color-bar" style="background:var(--area-growth)"></div>
+      <h2>Growth</h2>
+      <span class="area-summary">2 goals · 58% avg</span>
+      <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16" />
+            <circle class="ring-fill" cx="20" cy="20" r="16"
+              style="stroke:var(--area-growth);stroke-dasharray:100.53;stroke-dashoffset:30.16" />
+          </svg>
+          <span class="ring-text">70%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Complete AI/ML engineering course</div>
+          <div class="goal-meta">
+            <span class="metric">7 / 10 modules</span>
+            <span>Due: Jun 30</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="goal-quarter-segments">
+            <div class="q-seg done"></div>
+            <div class="q-seg done"></div>
+            <div class="q-seg in-progress"></div>
+            <div class="q-seg"></div>
+          </div>
+          <div style="display:flex;gap:3px">
+            <span class="q-label" style="width:28px">Q1</span>
+            <span class="q-label" style="width:28px">Q2</span>
+            <span class="q-label" style="width:28px">Q3</span>
+            <span class="q-label" style="width:28px">Q4</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-in-progress">In Progress</span>
+      </div>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16" />
+            <circle class="ring-fill" cx="20" cy="20" r="16"
+              style="stroke:var(--area-growth);stroke-dasharray:100.53;stroke-dashoffset:54.29" />
+          </svg>
+          <span class="ring-text">46%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Read 24 books</div>
+          <div class="goal-meta">
+            <span class="metric">11 / 24 books</span>
+            <span>Due: Dec 31</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="goal-quarter-segments">
+            <div class="q-seg done"></div>
+            <div class="q-seg in-progress"></div>
+            <div class="q-seg"></div>
+            <div class="q-seg"></div>
+          </div>
+          <div style="display:flex;gap:3px">
+            <span class="q-label" style="width:28px">Q1</span>
+            <span class="q-label" style="width:28px">Q2</span>
+            <span class="q-label" style="width:28px">Q3</span>
+            <span class="q-label" style="width:28px">Q4</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-in-progress">In Progress</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ RELATIONSHIPS ═══════════════════ -->
+  <div class="area-section fade-in">
+    <div class="area-header">
+      <div class="color-bar" style="background:var(--area-relationships)"></div>
+      <h2>Relationships</h2>
+      <span class="area-summary">2 goals · 40% avg</span>
+      <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16" />
+            <circle class="ring-fill" cx="20" cy="20" r="16"
+              style="stroke:var(--area-relationships);stroke-dasharray:100.53;stroke-dashoffset:50.27" />
+          </svg>
+          <span class="ring-text">50%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Visit Sarah in Dubai twice + host 2 visits</div>
+          <div class="goal-meta">
+            <span class="metric">2 / 4 visits</span>
+            <span>Due: Dec 31</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="goal-quarter-segments">
+            <div class="q-seg done"></div>
+            <div class="q-seg done"></div>
+            <div class="q-seg"></div>
+            <div class="q-seg"></div>
+          </div>
+          <div style="display:flex;gap:3px">
+            <span class="q-label" style="width:28px">Q1</span>
+            <span class="q-label" style="width:28px">Q2</span>
+            <span class="q-label" style="width:28px">Q3</span>
+            <span class="q-label" style="width:28px">Q4</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-on-track">On Track</span>
+      </div>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16" />
+            <circle class="ring-fill" cx="20" cy="20" r="16"
+              style="stroke:var(--area-relationships);stroke-dasharray:100.53;stroke-dashoffset:70.37" />
+          </svg>
+          <span class="ring-text">30%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Build a Lisbon friend group (5+ regulars)</div>
+          <div class="goal-meta">
+            <span class="metric">2 / 5 close friends</span>
+            <span>Due: Dec 31</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="goal-quarter-segments">
+            <div class="q-seg in-progress"></div>
+            <div class="q-seg in-progress"></div>
+            <div class="q-seg"></div>
+            <div class="q-seg"></div>
+          </div>
+          <div style="display:flex;gap:3px">
+            <span class="q-label" style="width:28px">Q1</span>
+            <span class="q-label" style="width:28px">Q2</span>
+            <span class="q-label" style="width:28px">Q3</span>
+            <span class="q-label" style="width:28px">Q4</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-at-risk">At Risk</span>
+      </div>
+      <div class="key-results">
+        <div class="kr-item">
+          <div class="kr-check partial"></div>
+          <span class="kr-title">Attend 2 social events per month</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:50%;background:var(--in-progress)"></div></div>
+          <span class="kr-value">8 / 16</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check"></div>
+          <span class="kr-title">Host 4 dinners at home</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:25%;background:var(--at-risk)"></div></div>
+          <span class="kr-value">1 / 4</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ PLAY ═══════════════════ -->
+  <div class="area-section fade-in">
+    <div class="area-header">
+      <div class="color-bar" style="background:var(--area-play)"></div>
+      <h2>Play</h2>
+      <span class="area-summary">1 goal · 55%</span>
+      <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16" />
+            <circle class="ring-fill" cx="20" cy="20" r="16"
+              style="stroke:var(--area-play);stroke-dasharray:100.53;stroke-dashoffset:45.24" />
+          </svg>
+          <span class="ring-text">55%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Surf 50 sessions this year</div>
+          <div class="goal-meta">
+            <span class="metric">28 / 50 sessions</span>
+            <span>Due: Dec 31</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="goal-quarter-segments">
+            <div class="q-seg done"></div>
+            <div class="q-seg done"></div>
+            <div class="q-seg in-progress"></div>
+            <div class="q-seg"></div>
+          </div>
+          <div style="display:flex;gap:3px">
+            <span class="q-label" style="width:28px">Q1</span>
+            <span class="q-label" style="width:28px">Q2</span>
+            <span class="q-label" style="width:28px">Q3</span>
+            <span class="q-label" style="width:28px">Q4</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-on-track">On Track</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ ENVIRONMENT ═══════════════════ -->
+  <div class="area-section fade-in">
+    <div class="area-header">
+      <div class="color-bar" style="background:var(--area-environment)"></div>
+      <h2>Environment</h2>
+      <span class="area-summary">1 goal · 82%</span>
+      <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16" />
+            <circle class="ring-fill" cx="20" cy="20" r="16"
+              style="stroke:var(--area-environment);stroke-dasharray:100.53;stroke-dashoffset:18.10" />
+          </svg>
+          <span class="ring-text">82%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Fully set up Lisbon apartment</div>
+          <div class="goal-meta">
+            <span class="metric">9 / 11 items</span>
+            <span>Due: Jun 30</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="goal-quarter-segments">
+            <div class="q-seg done"></div>
+            <div class="q-seg done"></div>
+            <div class="q-seg in-progress"></div>
+            <div class="q-seg"></div>
+          </div>
+          <div style="display:flex;gap:3px">
+            <span class="q-label" style="width:28px">Q1</span>
+            <span class="q-label" style="width:28px">Q2</span>
+            <span class="q-label" style="width:28px">Q3</span>
+            <span class="q-label" style="width:28px">Q4</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-on-track">On Track</span>
+      </div>
+      <div class="key-results">
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Buy desk + monitor setup</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Get proper internet (500Mbps+)</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check"></div>
+          <span class="kr-title">Hang art + final decoration touches</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:0%;background:var(--not-started)"></div></div>
+          <span class="kr-value">0%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check"></div>
+          <span class="kr-title">Get balcony plants + outdoor furniture</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:0%;background:var(--not-started)"></div></div>
+          <span class="kr-value">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="add-goal-row">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 1v12M1 7h12"/></svg>
+      Add goal...
+    </div>
+  </div>
+
+  <!-- ═══════════════════ QUARTERLY REVIEW ═══════════════════ -->
+  <div class="quarterly-review fade-in">
+    <div class="qr-header">
+      <h3>Quarterly Progress</h3>
+      <span class="qr-date">2026</span>
+    </div>
+    <div class="qr-grid">
+      <div class="qr-quarter">
+        <div class="q-name">Q1</div>
+        <div class="q-score">61%</div>
+        <div class="q-detail">8 of 13 KRs hit</div>
+        <div class="q-mini-bar"><div class="q-mini-bar-fill" style="width:61%;background:var(--done)"></div></div>
+      </div>
+      <div class="qr-quarter">
+        <div class="q-name">Q2</div>
+        <div class="q-score">54%</div>
+        <div class="q-detail">7 of 13 KRs hit</div>
+        <div class="q-mini-bar"><div class="q-mini-bar-fill" style="width:54%;background:var(--in-progress)"></div></div>
+      </div>
+      <div class="qr-quarter current">
+        <div class="q-name">Q3</div>
+        <div class="q-score">28%</div>
+        <div class="q-detail">3 of 11 KRs hit</div>
+        <div class="q-mini-bar"><div class="q-mini-bar-fill" style="width:28%;background:var(--at-risk)"></div></div>
+      </div>
+      <div class="qr-quarter">
+        <div class="q-name">Q4</div>
+        <div class="q-score">—</div>
+        <div class="q-detail">Not started</div>
+        <div class="q-mini-bar"><div class="q-mini-bar-fill" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -45,9 +45,11 @@ export async function getTask(id: string): Promise<TaskWithProject> {
 
 export async function createTask(data: TaskInsert): Promise<Task> {
   const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
   const { data: created, error } = await supabase
     .from("tasks")
-    .insert(data)
+    .insert({ ...data, user_id: user.id })
     .select()
     .single();
   if (error) throw error;

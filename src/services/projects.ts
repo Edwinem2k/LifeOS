@@ -38,9 +38,11 @@ export async function getProject(id: string): Promise<Project> {
 
 export async function createProject(data: ProjectInsert): Promise<Project> {
   const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
   const { data: created, error } = await supabase
     .from("projects")
-    .insert(data)
+    .insert({ ...data, user_id: user.id })
     .select()
     .single();
   if (error) throw error;
@@ -69,4 +71,17 @@ export async function archiveProject(id: string): Promise<void> {
     .update({ archived_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
+}
+
+export async function reorderProjects(
+  orderedIds: { id: string; sort_order: number }[]
+): Promise<void> {
+  const supabase = createClient();
+  for (const item of orderedIds) {
+    const { error } = await supabase
+      .from("projects")
+      .update({ sort_order: item.sort_order })
+      .eq("id", item.id);
+    if (error) throw error;
+  }
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, FolderKanban, CheckSquare, Target, MoreHorizontal } from "lucide-react";
+import { Logo } from "./Logo";
 
 const navItems = [
   { href: "/", label: "Today", icon: Home },
@@ -15,10 +16,11 @@ export function AppNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="border-b border-border-default bg-elevated px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto flex items-center h-14">
-        <Link href="/" className="text-lg font-semibold text-text-primary mr-8">
-          Life OS
+    <nav className="border-b border-border-default bg-elevated">
+      <div className="max-w-[1536px] mx-auto flex items-center h-14 px-4 sm:px-6 lg:px-8">
+        <Link href="/" className="flex items-center gap-2 text-lg font-semibold text-text-primary mr-8">
+          <Logo size={22} />
+          LifeOS
         </Link>
         <div className="flex items-center gap-1 ml-auto">
           {navItems.map(({ href, label, icon: Icon }) => {

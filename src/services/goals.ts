@@ -11,7 +11,7 @@ export async function getGoals(): Promise<Goal[]> {
     .from("goals")
     .select("*")
     .is("archived_at", null)
-    .order("sort_order", { ascending: true, nullsFirst: false });
+    .order("created_at", { ascending: true });
   if (error) throw error;
   return data;
 }

@@ -2,18 +2,20 @@ type Props = {
   value: number; // 0-100
   size?: number;
   strokeWidth?: number;
-  color?: string;
 };
 
 export function ProgressRing({
   value,
   size = 40,
   strokeWidth = 3.5,
-  color = "var(--color-accent-success)",
 }: Props) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const strokeDasharray = `${(circumference * value) / 100} ${circumference}`;
+
+  // Smooth red→amber→green gradient via HSL hue (0=red, 60=amber, 120=green)
+  const hue = Math.round((value / 100) * 120);
+  const color = `hsl(${hue}, 70%, 45%)`;
 
   return (
     <svg
@@ -41,15 +43,6 @@ export function ProgressRing({
         strokeLinecap="round"
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
-      <text
-        x="50%"
-        y="50%"
-        textAnchor="middle"
-        dominantBaseline="central"
-        className="text-[10px] font-semibold fill-text-primary"
-      >
-        {Math.round(value)}%
-      </text>
     </svg>
   );
 }

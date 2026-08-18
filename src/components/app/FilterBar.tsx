@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, ChevronDown, Check } from "lucide-react";
+import { Search, ChevronDown, Check, X } from "lucide-react";
+import { StatusPill } from "@/components/app/StatusPill";
 
 export function SearchPill({
   value,
@@ -31,11 +32,19 @@ export function FilterPill({
   options,
   selected,
   onChange,
+  pillType,
+  autoExclude,
+  onRemoveAutoExclude,
+  onSelectAll,
 }: {
   label: string;
   options: { value: string; label: string }[];
-  selected: string | null;
-  onChange: (value: string | null) => void;
+  selected: string[];
+  onChange: (value: string[]) => void;
+  pillType?: "status" | "area" | "priority";
+  autoExclude?: string[];
+  onRemoveAutoExclude?: (value: string) => void;
+  onSelectAll?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -50,7 +59,15 @@ export function FilterPill({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const isActive = selected !== null;
+  const isActive = selected.length > 0;
+
+  function toggle(val: string) {
+    if (selected.includes(val)) {
+      onChange(selected.filter((v) => v !== val));
+    } else {
+      onChange([...selected, val]);
+    }
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -63,42 +80,65 @@ export function FilterPill({
         }`}
       >
         {label}
-        {selected && (
-          <span className="text-xs font-medium">
-            : {options.find((o) => o.value === selected)?.label}
+        {selected.length === 1 && pillType ? (
+          <span className="ml-0.5">
+            <StatusPill value={selected[0]} type={pillType} />
           </span>
-        )}
+        ) : selected.length === 1 ? (
+          <span className="text-xs font-medium">
+            : {options.find((o) => o.value === selected[0])?.label}
+          </span>
+        ) : selected.length > 1 ? (
+          <span className="text-xs font-medium bg-accent-primary/10 text-accent-primary px-1.5 py-0.5 rounded-full ml-0.5">
+            {selected.length}
+          </span>
+        ) : null}
         <ChevronDown size={14} />
       </button>
 
       {open && (
-        <div className="absolute top-full mt-1 left-0 bg-elevated border border-border-default rounded-md shadow-lg z-30 min-w-[160px]">
+        <div className="absolute top-full mt-1 left-0 bg-elevated border border-border-default rounded-md shadow-lg z-30 min-w-[160px] py-1">
           <button
             onClick={() => {
-              onChange(null);
+              onChange([]);
+              onSelectAll?.();
               setOpen(false);
             }}
-            className={`w-full text-left px-3 py-2 text-sm hover:bg-card ${
-              !selected ? "text-accent-primary" : "text-text-secondary"
+            className={`w-full text-left px-3 py-1.5 text-sm hover:bg-card ${
+              !isActive ? "text-accent-primary" : "text-text-secondary"
             }`}
           >
             All
           </button>
-          {options.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => {
-                onChange(opt.value);
-                setOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 text-sm hover:bg-card flex items-center justify-between text-text-primary"
-            >
-              {opt.label}
-              {selected === opt.value && (
-                <Check size={14} className="text-accent-primary" />
-              )}
-            </button>
-          ))}
+          {options.map((opt) => {
+            const isSelected = selected.includes(opt.value);
+            const isAutoExcluded = autoExclude?.includes(opt.value) && !isSelected;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  if (isAutoExcluded && onRemoveAutoExclude) {
+                    onRemoveAutoExclude(opt.value);
+                  } else {
+                    toggle(opt.value);
+                  }
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-card flex items-center justify-between text-text-primary"
+              >
+                {pillType ? (
+                  <StatusPill value={opt.value} type={pillType} />
+                ) : (
+                  <span className="text-sm">{opt.label}</span>
+                )}
+                {isSelected && (
+                  <Check size={14} className="text-accent-primary ml-2" />
+                )}
+                {isAutoExcluded && (
+                  <X size={14} className="text-accent-danger ml-2" />
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

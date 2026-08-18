@@ -3,7 +3,6 @@
 import { useState, useMemo } from "react";
 import { useGoals, useUpdateGoal } from "@/hooks/use-goals";
 import { useGoalProgress } from "@/hooks/use-goal-progress";
-import { useLinks } from "@/hooks/use-links";
 import { FlyoutPanel, type FieldConfig } from "@/components/app/FlyoutPanel";
 import { StatusPill } from "@/components/app/StatusPill";
 import { ProgressRing } from "@/components/app/ProgressRing";
@@ -11,9 +10,11 @@ import { GOAL_STATUSES, LIFE_AREAS } from "@/lib/constants";
 import { ChevronRight, ChevronDown } from "lucide-react";
 
 const HORIZONS = [
-  { value: "year", label: "Year" },
-  { value: "quarter", label: "Quarter" },
-  { value: "month", label: "Month" },
+  { value: "annual", label: "Annual" },
+  { value: "q1", label: "Q1" },
+  { value: "q2", label: "Q2" },
+  { value: "q3", label: "Q3" },
+  { value: "q4", label: "Q4" },
 ];
 
 const GOAL_FIELDS: FieldConfig[] = [
@@ -101,9 +102,9 @@ function GoalRow({
           <p className="text-sm font-medium text-text-primary truncate">
             {goal.title}
           </p>
-          {goal.unit && prog && (
+          {goal.unit && (
             <p className="text-xs text-text-secondary">
-              {prog.current_value ?? goal.current_value ?? 0}/{prog.target_value ?? goal.target_value ?? "?"} {goal.unit}
+              {goal.current_value ?? 0}/{goal.target_value ?? "?"} {goal.unit}
             </p>
           )}
         </div>
@@ -131,7 +132,7 @@ function GoalRow({
 
 export default function GoalsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { data: goals, isLoading } = useGoals();
+  const { data: goals, isLoading, isError } = useGoals();
   const { data: progress } = useGoalProgress();
   const updateGoal = useUpdateGoal();
 
@@ -151,6 +152,17 @@ export default function GoalsPage() {
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-14 bg-card rounded-sm animate-pulse" />
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div>
+        <h1 className="text-2xl font-semibold mb-4">Goals</h1>
+        <div className="text-center py-12 text-accent-danger">
+          Error loading goals. Check the browser console for details.
         </div>
       </div>
     );

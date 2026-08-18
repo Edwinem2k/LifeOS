@@ -11,10 +11,10 @@ export const TASK_STATUSES = [
 ] as const;
 
 export const PROJECT_STATUSES = [
-  { value: "active", label: "Active", color: "var(--color-accent-success)" },
-  { value: "on_hold", label: "On Hold", color: "var(--color-accent-warning)" },
-  { value: "completed", label: "Completed", color: "var(--color-status-done)" },
-  { value: "dropped", label: "Dropped", color: "var(--color-text-muted)" },
+  { value: "idea", label: "Idea", color: "var(--color-status-inbox)" },
+  { value: "active", label: "Active", color: "var(--color-accent-info)" },
+  { value: "paused", label: "Paused", color: "var(--color-accent-warning)" },
+  { value: "done", label: "Done", color: "var(--color-status-done)" },
 ] as const;
 
 export const GOAL_STATUSES = [
@@ -25,11 +25,9 @@ export const GOAL_STATUSES = [
 ] as const;
 
 export const PRIORITIES = [
-  { value: "critical", label: "Critical", color: "var(--color-accent-danger)" },
-  { value: "high", label: "High", color: "var(--color-accent-warning)" },
+  { value: "high", label: "High", color: "var(--color-accent-danger)" },
   { value: "medium", label: "Medium", color: "var(--color-accent-info)" },
   { value: "low", label: "Low", color: "var(--color-text-muted)" },
-  { value: "none", label: "None", color: "var(--color-text-muted)" },
 ] as const;
 
 export const LIFE_AREAS = [
@@ -63,8 +61,12 @@ const STATUS_MAP = Object.fromEntries([
 const AREA_MAP = Object.fromEntries(LIFE_AREAS.map((a) => [a.value, a]));
 const PRIORITY_MAP = Object.fromEntries(PRIORITIES.map((p) => [p.value, p]));
 
-export function getStatusColor(status: string, type: "task" | "project" | "goal" = "task"): string {
-  return STATUS_MAP[`${type}:${status}`]?.color ?? "var(--color-text-muted)";
+export function getStatusColor(status: string, type?: "task" | "project" | "goal"): string {
+  if (type) return STATUS_MAP[`${type}:${status}`]?.color ?? "var(--color-text-muted)";
+  return STATUS_MAP[`task:${status}`]?.color
+    ?? STATUS_MAP[`project:${status}`]?.color
+    ?? STATUS_MAP[`goal:${status}`]?.color
+    ?? "var(--color-text-muted)";
 }
 
 export function getStatusLabel(status: string, type: "task" | "project" | "goal" = "task"): string {
