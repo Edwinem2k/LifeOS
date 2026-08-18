@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTasks, useCreateTask, useUpdateTask, useCompleteTask } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
@@ -69,6 +69,14 @@ type ColWidths = {
 };
 
 export default function TasksPage() {
+  return (
+    <Suspense>
+      <TasksPageInner />
+    </Suspense>
+  );
+}
+
+function TasksPageInner() {
   const searchParams = useSearchParams();
   const [view, setView] = useState<ViewMode>("table");
   const [search, setSearch] = useState("");
