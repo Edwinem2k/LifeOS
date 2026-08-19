@@ -699,34 +699,33 @@ export default function GoalsPage() {
           {filteredGoals.length} goal{filteredGoals.length !== 1 ? "s" : ""}
         </p>
 
-        {/* Horizon tabs */}
-        <div className="flex gap-1 mt-4">
-          {HORIZONS.map((h) => (
-            <button
-              key={h.value}
-              onClick={() => setSelectedHorizon(h.value)}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                selectedHorizon === h.value
-                  ? "bg-accent-primary text-white"
-                  : "text-text-secondary hover:bg-card"
-              }`}
-            >
-              {h.label}
-            </button>
-          ))}
+        {/* Horizon tabs + Status filter */}
+        <div className="flex items-center gap-3 mt-4">
+          <div className="flex gap-1">
+            {HORIZONS.map((h) => (
+              <button
+                key={h.value}
+                onClick={() => setSelectedHorizon(h.value)}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  selectedHorizon === h.value
+                    ? "bg-accent-primary text-white"
+                    : "text-text-secondary hover:bg-card"
+                }`}
+              >
+                {h.label}
+              </button>
+            ))}
+          </div>
+          <div className="h-5 w-px bg-border-default" />
+          <FilterPill
+            label="Status"
+            options={GOAL_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
+            selected={statusFilter}
+            onChange={setStatusFilter}
+            pillType="status"
+          />
         </div>
       </div>
-
-      {/* Filter bar */}
-      <FilterBar>
-        <FilterPill
-          label="Status"
-          options={GOAL_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
-          selected={statusFilter}
-          onChange={setStatusFilter}
-          pillType="status"
-        />
-      </FilterBar>
 
       {/* Progress strip */}
       <div className="bg-elevated border border-border-default rounded-md p-4 mb-6">
