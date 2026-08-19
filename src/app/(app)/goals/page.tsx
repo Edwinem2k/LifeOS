@@ -791,6 +791,13 @@ export default function GoalsPage() {
               <span className="text-xs text-text-muted font-medium">
                 {areaGoals.length} goal{areaGoals.length !== 1 ? "s" : ""} · {areaPct}% avg
               </span>
+              <button
+                onClick={() => handleQuickAdd(area.value)}
+                className="p-1 rounded text-text-muted hover:text-accent-primary hover:bg-card transition-colors"
+                title={`Add goal to ${area.label}`}
+              >
+                <Plus size={16} />
+              </button>
             </div>
 
             {/* Goal cards */}
@@ -920,31 +927,10 @@ export default function GoalsPage() {
                 );
               })}
 
-              {/* Quick add button */}
-              <button
-                onClick={() => handleQuickAdd(area.value)}
-                className="w-full flex items-center justify-center gap-1 py-2 border-2 border-dashed border-border-default rounded-md text-xs text-text-muted hover:text-accent-primary hover:border-accent-primary transition-colors"
-              >
-                <Plus size={14} />
-                Add goal to {area.label}...
-              </button>
             </div>
           </div>
         );
       })}
-
-      {/* Quick add for areas with no goals */}
-      {areasWithGoals.length === 0 &&
-        LIFE_AREAS.map((area) => (
-          <button
-            key={area.value}
-            onClick={() => handleQuickAdd(area.value)}
-            className="w-full flex items-center justify-center gap-1 py-2 mb-2 border-2 border-dashed border-border-default rounded-md text-xs text-text-muted hover:text-accent-primary hover:border-accent-primary transition-colors"
-          >
-            <Plus size={14} />
-            Add {area.label} goal
-          </button>
-        ))}
 
       {/* GoalFlyout */}
       {selected && (
