@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTasks, useCreateTask, useUpdateTask, useCompleteTask } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
+import { useGoalsForEntities } from "@/hooks/use-goals";
 import { FilterBar, SearchPill, FilterPill } from "@/components/app/FilterBar";
 import { FlyoutPanel, type FieldConfig } from "@/components/app/FlyoutPanel";
 import { StatusPill } from "@/components/app/StatusPill";
@@ -65,7 +66,7 @@ type ViewMode = "table" | "kanban";
 type SortDir = "asc" | "desc";
 
 type ColWidths = {
-  task: number; status: number; priority: number; project: number; area: number; deadline: number; notes: number;
+  task: number; status: number; priority: number; project: number; area: number; goal: number; deadline: number; notes: number;
 };
 
 export default function TasksPage() {
@@ -94,7 +95,7 @@ function TasksPageInner() {
   const [doneAutoExcluded, setDoneAutoExcluded] = useState(true);
 
   const [colWidths, setColWidths] = useState<ColWidths>({
-    task: 280, status: 120, priority: 100, project: 180, area: 120, deadline: 120, notes: 44,
+    task: 280, status: 120, priority: 100, project: 180, area: 120, goal: 120, deadline: 120, notes: 44,
   });
   const resizingRef = useRef<{ key: keyof ColWidths; startX: number; startW: number } | null>(null);
   const didResizeRef = useRef(false);
@@ -102,6 +103,8 @@ function TasksPageInner() {
 
   const { data: tasks, isLoading } = useTasks();
   const { data: projects } = useProjects();
+  const taskIds = useMemo(() => (tasks ?? []).map((t: any) => t.id), [tasks]);
+  const { data: taskGoals } = useGoalsForEntities("task", taskIds);
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const completeTask = useCompleteTask();
@@ -341,6 +344,14 @@ function TasksPageInner() {
           <div className="px-2 flex items-center" style={{ minWidth: colWidths.area, flex: 1 }}>
             <EditableCell value={node.area ?? ""} onSave={saveField(node.id, "area")} type="select" options={LIFE_AREAS.map((a) => ({ value: a.value, label: a.label }))} displayAs="pill" pillType="area" />
           </div>
+          {/* Goal */}
+          <div className="px-2 flex items-center" style={{ minWidth: colWidths.goal, flex: 1 }}>
+            {taskGoals?.[node.id] ? (
+              <span className="text-xs px-1.5 py-0.5 bg-card rounded border border-border-default text-text-secondary truncate max-w-[100px] inline-block">
+                {taskGoals[node.id].title}
+              </span>
+            ) : null}
+          </div>
           {/* Deadline */}
           <DeadlineCell deadline={node.deadline} status={node.status} minWidth={colWidths.deadline} onSave={(date) => updateTask.mutate({ id: node.id, data: { deadline: date } })} />
           {/* Notes */}
@@ -428,6 +439,9 @@ function TasksPageInner() {
             </div>
             <div className="px-3 flex items-center relative cursor-pointer hover:text-text-primary" style={{ minWidth: colWidths.area, flex: 1 }} onClick={() => handleSort("area")}>
               Area {sortIndicator("area")} {renderResizeHandle("area")}
+            </div>
+            <div className="px-3 flex items-center relative" style={{ minWidth: colWidths.goal, flex: 1 }}>
+              Goal {renderResizeHandle("goal")}
             </div>
             <div className="px-3 flex items-center relative cursor-pointer hover:text-text-primary" style={{ minWidth: colWidths.deadline, flex: 1 }} onClick={() => handleSort("deadline")}>
               Deadline {sortIndicator("deadline")} {renderResizeHandle("deadline")}

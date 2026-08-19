@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useProjects, useCreateProject, useUpdateProject, useReorderProjects } from "@/hooks/use-projects";
 import { useProjectProgress } from "@/hooks/use-project-progress";
+import { useGoalsForEntities } from "@/hooks/use-goals";
 import { DataTable, type Column } from "@/components/app/DataTable";
 import { FilterBar, SearchPill, FilterPill } from "@/components/app/FilterBar";
 import { FlyoutPanel, type FieldConfig, type StatConfig } from "@/components/app/FlyoutPanel";
@@ -74,6 +75,8 @@ export default function ProjectsPage() {
 
   const { data: projects, isLoading } = useProjects();
   const { data: progress } = useProjectProgress();
+  const projectIds = useMemo(() => (projects ?? []).map((p: any) => p.id), [projects]);
+  const { data: projectGoals } = useGoalsForEntities("project", projectIds);
   const updateProject = useUpdateProject();
   const createProject = useCreateProject();
   const reorderProjects = useReorderProjects();
@@ -254,6 +257,17 @@ export default function ProjectsPage() {
           pillType="area"
         />
       ),
+    },
+    {
+      key: "goal", header: "Goal", width: "120px",
+      render: (row) => {
+        const goal = projectGoals?.[row.id];
+        return goal ? (
+          <span className="text-xs px-1.5 py-0.5 bg-card rounded border border-border-default text-text-secondary truncate max-w-[100px] inline-block">
+            {goal.title}
+          </span>
+        ) : null;
+      },
     },
     {
       key: "priority", header: "Priority", width: "120px",
