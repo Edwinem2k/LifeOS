@@ -20,6 +20,7 @@ import { useTasks } from "@/hooks/use-tasks";
 import { ProgressRing } from "@/components/app/ProgressRing";
 import { StatusPill } from "@/components/app/StatusPill";
 import { toast } from "@/components/app/Toast";
+import { FilterBar, FilterPill } from "@/components/app/FilterBar";
 import { GOAL_STATUSES, HORIZONS, LIFE_AREAS } from "@/lib/constants";
 
 /* ------------------------------------------------------------------ */
@@ -547,7 +548,7 @@ export default function GoalsPage() {
   const updateGoal = useUpdateGoal();
 
   const [selectedHorizon, setSelectedHorizon] = useState("annual");
-  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set());
 
@@ -599,11 +600,11 @@ export default function GoalsPage() {
     if (selectedHorizon !== "annual") {
       filtered = filtered.filter((g: any) => g.horizon === selectedHorizon || g.horizon === "annual");
     }
-    if (selectedStatus) {
-      filtered = filtered.filter((g: any) => g.status === selectedStatus);
+    if (statusFilter.length > 0) {
+      filtered = filtered.filter((g: any) => statusFilter.includes(g.status));
     }
     return filtered;
-  }, [goals, selectedHorizon, selectedStatus]);
+  }, [goals, selectedHorizon, statusFilter]);
 
   // Group by area
   const goalsByArea = useMemo(() => {
@@ -698,55 +699,34 @@ export default function GoalsPage() {
           {filteredGoals.length} goal{filteredGoals.length !== 1 ? "s" : ""}
         </p>
 
-        {/* Horizon tabs + Status filters */}
-        <div className="flex items-center gap-4 mt-4">
-          <div className="flex gap-1">
-            {HORIZONS.map((h) => (
-              <button
-                key={h.value}
-                onClick={() => setSelectedHorizon(h.value)}
-                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  selectedHorizon === h.value
-                    ? "bg-accent-primary text-white"
-                    : "text-text-secondary hover:bg-card"
-                }`}
-              >
-                {h.label}
-              </button>
-            ))}
-          </div>
-          <div className="h-5 w-px bg-border-default" />
-          <div className="flex gap-1">
+        {/* Horizon tabs */}
+        <div className="flex gap-1 mt-4">
+          {HORIZONS.map((h) => (
             <button
-              onClick={() => setSelectedStatus(null)}
-              className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
-                selectedStatus === null
-                  ? "bg-card text-text-primary font-medium"
-                  : "text-text-muted hover:bg-card"
+              key={h.value}
+              onClick={() => setSelectedHorizon(h.value)}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                selectedHorizon === h.value
+                  ? "bg-accent-primary text-white"
+                  : "text-text-secondary hover:bg-card"
               }`}
             >
-              All
+              {h.label}
             </button>
-            {GOAL_STATUSES.map((s) => (
-              <button
-                key={s.value}
-                onClick={() => setSelectedStatus(selectedStatus === s.value ? null : s.value)}
-                className={`px-2.5 py-1 text-xs rounded-md transition-colors flex items-center gap-1.5 ${
-                  selectedStatus === s.value
-                    ? "bg-card text-text-primary font-medium"
-                    : "text-text-muted hover:bg-card"
-                }`}
-              >
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: s.color }}
-                />
-                {s.label}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
       </div>
+
+      {/* Filter bar */}
+      <FilterBar>
+        <FilterPill
+          label="Status"
+          options={GOAL_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
+          selected={statusFilter}
+          onChange={setStatusFilter}
+          pillType="status"
+        />
+      </FilterBar>
 
       {/* Progress strip */}
       <div className="bg-elevated border border-border-default rounded-md p-4 mb-6">
