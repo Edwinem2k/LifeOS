@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Plus, ChevronDown, X, Check, Search, ArrowRight, Link2 } from "lucide-react";
+import { EditableCell } from "@/components/app/EditableCell";
 import {
   useGoals,
   useCreateGoal,
@@ -208,54 +209,50 @@ function GoalFlyout({
           </div>
 
           {/* Inline metadata row */}
-          <div className="flex flex-wrap gap-3">
-            {/* Status */}
-            <select
-              value={goal.status ?? "not_started"}
-              onChange={(e) => saveField("status", e.target.value)}
-              className="text-xs px-2 py-1 rounded bg-card border border-border-default text-text-primary"
-            >
-              {GOAL_STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-
-            {/* Area */}
-            <select
-              value={goal.area ?? ""}
-              onChange={(e) => saveField("area", e.target.value)}
-              className="text-xs px-2 py-1 rounded bg-card border border-border-default text-text-primary"
-            >
-              <option value="">No area</option>
-              {LIFE_AREAS.map((a) => (
-                <option key={a.value} value={a.value}>
-                  {a.label}
-                </option>
-              ))}
-            </select>
-
-            {/* Horizon */}
-            <select
-              value={goal.horizon ?? "annual"}
-              onChange={(e) => saveField("horizon", e.target.value)}
-              className="text-xs px-2 py-1 rounded bg-card border border-border-default text-text-primary"
-            >
-              {HORIZONS.map((h) => (
-                <option key={h.value} value={h.value}>
-                  {h.label}
-                </option>
-              ))}
-            </select>
-
-            {/* Due Date */}
-            <input
-              type="date"
-              value={goal.due_date ?? ""}
-              onChange={(e) => saveField("due_date", e.target.value)}
-              className="text-xs px-2 py-1 rounded bg-card border border-border-default text-text-primary"
-            />
+          <div className="flex flex-wrap gap-x-4 gap-y-2 px-4 py-3 border-b border-border-default" style={{ backgroundColor: "#f0f0f0" }}>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-text-muted">Status</span>
+              <EditableCell
+                value={goal.status ?? "not_started"}
+                onSave={(v) => saveField("status", v)}
+                type="select"
+                options={GOAL_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
+                displayAs="pill"
+                pillType="status"
+                placeholder="None"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-text-muted">Area</span>
+              <EditableCell
+                value={goal.area ?? ""}
+                onSave={(v) => saveField("area", v)}
+                type="select"
+                options={LIFE_AREAS.map((a) => ({ value: a.value, label: a.label }))}
+                displayAs="pill"
+                pillType="area"
+                placeholder="None"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-text-muted">Horizon</span>
+              <EditableCell
+                value={goal.horizon ?? "annual"}
+                onSave={(v) => saveField("horizon", v)}
+                type="select"
+                options={HORIZONS.map((h) => ({ value: h.value, label: h.label }))}
+                placeholder="None"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-text-muted">Due</span>
+              <EditableCell
+                value={goal.due_date ?? ""}
+                onSave={(v) => saveField("due_date", v)}
+                type="date"
+                placeholder="None"
+              />
+            </div>
           </div>
 
           {/* Progress section (only when no KRs) */}

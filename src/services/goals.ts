@@ -44,6 +44,13 @@ export async function createKeyResult(goalId: string, data: Partial<GoalInsert>)
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
+  // Fetch parent goal to inherit required fields (area is NOT NULL)
+  const { data: parent, error: parentError } = await supabase
+    .from("goals")
+    .select("area, horizon")
+    .eq("id", goalId)
+    .single();
+  if (parentError) throw parentError;
   const { data: created, error } = await supabase
     .from("goals")
     .insert({
@@ -51,6 +58,8 @@ export async function createKeyResult(goalId: string, data: Partial<GoalInsert>)
       user_id: user.id,
       kind: "key_result",
       parent_goal_id: goalId,
+      area: data.area ?? parent.area,
+      horizon: data.horizon ?? parent.horizon,
       status: "not_started",
     } as GoalInsert)
     .select()
