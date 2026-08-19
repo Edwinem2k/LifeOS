@@ -40,9 +40,17 @@ export async function createProject(data: ProjectInsert): Promise<Project> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
+  const { data: maxRow } = await supabase
+    .from("projects")
+    .select("sort_order")
+    .is("archived_at", null)
+    .order("sort_order", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  const nextOrder = (maxRow?.sort_order ?? -1) + 1;
   const { data: created, error } = await supabase
     .from("projects")
-    .insert({ ...data, user_id: user.id })
+    .insert({ ...data, user_id: user.id, sort_order: nextOrder })
     .select()
     .single();
   if (error) throw error;

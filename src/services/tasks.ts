@@ -47,9 +47,18 @@ export async function createTask(data: TaskInsert): Promise<Task> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
+  // Get max sort_order so new task appears at the bottom
+  const { data: maxRow } = await supabase
+    .from("tasks")
+    .select("sort_order")
+    .is("archived_at", null)
+    .order("sort_order", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  const nextOrder = (maxRow?.sort_order ?? -1) + 1;
   const { data: created, error } = await supabase
     .from("tasks")
-    .insert({ ...data, user_id: user.id })
+    .insert({ ...data, user_id: user.id, sort_order: nextOrder })
     .select()
     .single();
   if (error) throw error;
