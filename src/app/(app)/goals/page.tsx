@@ -394,15 +394,6 @@ function GoalFlyout({
                         >
                           → Task
                         </button>
-                        <button
-                          onClick={() =>
-                            setLinkSearch({ krId: kr.id, type: "project", query: "" })
-                          }
-                          className="text-[0.625rem] text-text-muted hover:text-accent-primary px-1"
-                          title="Link existing entity"
-                        >
-                          Link
-                        </button>
                       </>
                     )}
                     <button
