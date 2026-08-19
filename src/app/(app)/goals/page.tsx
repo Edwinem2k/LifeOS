@@ -901,18 +901,23 @@ export default function GoalsPage() {
                               key={kr.id}
                               className="flex items-center gap-2 py-1"
                             >
-                              {/* Check circle (3 states) */}
-                              <span
-                                className={`shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                              {/* Check circle (3 states, clickable) */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newStatus = kr.status === "done" ? "not_started" : "done";
+                                  updateGoal.mutate({ id: kr.id, data: { status: newStatus } });
+                                }}
+                                className={`shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors ${
                                   kr.status === "done"
                                     ? "bg-accent-success border-accent-success text-white"
                                     : kr.status === "in_progress"
-                                    ? "border-accent-primary"
-                                    : "border-border-default"
+                                    ? "border-accent-primary hover:border-accent-success"
+                                    : "border-border-default hover:border-accent-success"
                                 }`}
                               >
                                 {kr.status === "done" && <Check size={10} />}
-                              </span>
+                              </button>
                               <span
                                 className={`flex-1 text-xs truncate ${
                                   kr.status === "done"
