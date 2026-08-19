@@ -26,3 +26,10 @@ export async function getTodayAgenda() {
   if (error) throw error;
   return data;
 }
+
+export async function getAreaProgress() {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("area_progress").select("*");
+  if (error) throw error;
+  return data ?? [];
+}
