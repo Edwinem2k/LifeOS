@@ -20,8 +20,17 @@ export const PROJECT_STATUSES = [
 export const GOAL_STATUSES = [
   { value: "not_started", label: "Not Started", color: "var(--color-status-inbox)" },
   { value: "in_progress", label: "In Progress", color: "var(--color-status-in-progress)" },
-  { value: "achieved", label: "Achieved", color: "var(--color-status-done)" },
-  { value: "abandoned", label: "Abandoned", color: "var(--color-text-muted)" },
+  { value: "on_track", label: "On Track", color: "var(--color-accent-success)" },
+  { value: "at_risk", label: "At Risk", color: "var(--color-accent-warning)" },
+  { value: "done", label: "Done", color: "var(--color-status-done)" },
+] as const;
+
+export const HORIZONS = [
+  { value: "annual", label: "Annual" },
+  { value: "q1", label: "Q1" },
+  { value: "q2", label: "Q2" },
+  { value: "q3", label: "Q3" },
+  { value: "q4", label: "Q4" },
 ] as const;
 
 export const PRIORITIES = [
