@@ -21,7 +21,7 @@ export const GOAL_STATUSES = [
   { value: "not_started", label: "Not Started", color: "var(--color-status-inbox)" },
   { value: "in_progress", label: "In Progress", color: "var(--color-status-in-progress)" },
   { value: "on_track", label: "On Track", color: "var(--color-accent-success)" },
-  { value: "at_risk", label: "At Risk", color: "var(--color-accent-warning)" },
+  { value: "at_risk", label: "At Risk", color: "var(--color-accent-danger)" },
   { value: "done", label: "Done", color: "var(--color-status-done)" },
 ] as const;
 

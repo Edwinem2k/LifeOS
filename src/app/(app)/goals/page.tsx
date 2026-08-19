@@ -547,6 +547,7 @@ export default function GoalsPage() {
   const updateGoal = useUpdateGoal();
 
   const [selectedHorizon, setSelectedHorizon] = useState("annual");
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set());
 
@@ -592,12 +593,17 @@ export default function GoalsPage() {
     return Math.round(areas.reduce((s, a) => s + a.avg_pct, 0) / areas.length);
   }, [areaProgressMap]);
 
-  // Filtered goals: kind='goal', then by horizon tab
+  // Filtered goals: kind='goal', then by horizon tab, then by status
   const filteredGoals = useMemo(() => {
-    const allGoals = (goals ?? []).filter((g: any) => g.kind === "goal");
-    if (selectedHorizon === "annual") return allGoals;
-    return allGoals.filter((g: any) => g.horizon === selectedHorizon || g.horizon === "annual");
-  }, [goals, selectedHorizon]);
+    let filtered = (goals ?? []).filter((g: any) => g.kind === "goal");
+    if (selectedHorizon !== "annual") {
+      filtered = filtered.filter((g: any) => g.horizon === selectedHorizon || g.horizon === "annual");
+    }
+    if (selectedStatus) {
+      filtered = filtered.filter((g: any) => g.status === selectedStatus);
+    }
+    return filtered;
+  }, [goals, selectedHorizon, selectedStatus]);
 
   // Group by area
   const goalsByArea = useMemo(() => {
@@ -692,21 +698,53 @@ export default function GoalsPage() {
           {filteredGoals.length} goal{filteredGoals.length !== 1 ? "s" : ""}
         </p>
 
-        {/* Horizon tabs */}
-        <div className="flex gap-1 mt-4">
-          {HORIZONS.map((h) => (
+        {/* Horizon tabs + Status filters */}
+        <div className="flex items-center gap-4 mt-4">
+          <div className="flex gap-1">
+            {HORIZONS.map((h) => (
+              <button
+                key={h.value}
+                onClick={() => setSelectedHorizon(h.value)}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  selectedHorizon === h.value
+                    ? "bg-accent-primary text-white"
+                    : "text-text-secondary hover:bg-card"
+                }`}
+              >
+                {h.label}
+              </button>
+            ))}
+          </div>
+          <div className="h-5 w-px bg-border-default" />
+          <div className="flex gap-1">
             <button
-              key={h.value}
-              onClick={() => setSelectedHorizon(h.value)}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                selectedHorizon === h.value
-                  ? "bg-accent-primary text-white"
-                  : "text-text-secondary hover:bg-card"
+              onClick={() => setSelectedStatus(null)}
+              className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                selectedStatus === null
+                  ? "bg-card text-text-primary font-medium"
+                  : "text-text-muted hover:bg-card"
               }`}
             >
-              {h.label}
+              All
             </button>
-          ))}
+            {GOAL_STATUSES.map((s) => (
+              <button
+                key={s.value}
+                onClick={() => setSelectedStatus(selectedStatus === s.value ? null : s.value)}
+                className={`px-2.5 py-1 text-xs rounded-md transition-colors flex items-center gap-1.5 ${
+                  selectedStatus === s.value
+                    ? "bg-card text-text-primary font-medium"
+                    : "text-text-muted hover:bg-card"
+                }`}
+              >
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: s.color }}
+                />
+                {s.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
