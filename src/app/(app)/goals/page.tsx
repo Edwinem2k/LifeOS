@@ -318,64 +318,92 @@ function GoalFlyout({
             <h3 className="text-xs font-medium text-text-muted uppercase tracking-wide">
               Key Results
             </h3>
-            {krs.map((kr: any) => (
-              <div
-                key={kr.id}
-                className="group flex items-center gap-2 py-1.5 px-2 rounded hover:bg-card"
-              >
-                {/* Check circle */}
-                <button
-                  onClick={() => toggleKR(kr)}
-                  className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                    kr.status === "done"
-                      ? "bg-accent-success border-accent-success text-white"
-                      : "border-border-default text-transparent hover:border-accent-primary"
-                  }`}
+            {krs.map((kr: any) => {
+              const krPct = kr.target_value > 0
+                ? Math.round(Math.min(100, ((kr.current_value ?? 0) / kr.target_value) * 100))
+                : kr.status === "done" ? 100 : 0;
+              return (
+                <div
+                  key={kr.id}
+                  className="group flex items-center gap-2 py-1.5 px-2 rounded hover:bg-card"
                 >
-                  <Check size={12} />
-                </button>
+                  {/* Check circle */}
+                  <button
+                    onClick={() => toggleKR(kr)}
+                    className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                      kr.status === "done"
+                        ? "bg-accent-success border-accent-success text-white"
+                        : "border-border-default text-transparent hover:border-accent-primary"
+                    }`}
+                  >
+                    <Check size={12} />
+                  </button>
 
-                {/* Title */}
-                <span
-                  className={`flex-1 text-sm ${
-                    kr.status === "done"
-                      ? "line-through text-text-muted"
-                      : "text-text-primary"
-                  }`}
-                >
-                  {kr.title}
-                </span>
+                  {/* Title */}
+                  <span
+                    className={`flex-1 text-sm ${
+                      kr.status === "done"
+                        ? "line-through text-text-muted"
+                        : "text-text-primary"
+                    }`}
+                  >
+                    {kr.title}
+                  </span>
 
-                {/* Hover actions */}
-                <div className="hidden group-hover:flex items-center gap-1">
-                  <button
-                    onClick={() => handlePushToProject(kr.id, kr.title)}
-                    className="text-xs text-text-muted hover:text-accent-primary px-1"
-                    title="Push to Project"
-                  >
-                    <ArrowRight size={14} />
-                    <span className="sr-only">Project</span>
-                  </button>
-                  <button
-                    onClick={() => handlePushToTask(kr.id, kr.title)}
-                    className="text-xs text-text-muted hover:text-accent-primary px-1"
-                    title="Push to Task"
-                  >
-                    <ArrowRight size={14} />
-                    <span className="sr-only">Task</span>
-                  </button>
-                  <button
-                    onClick={() =>
-                      setLinkSearch({ krId: kr.id, type: "project", query: "" })
-                    }
-                    className="text-xs text-text-muted hover:text-accent-primary px-1"
-                    title="Link existing entity"
-                  >
-                    <Link2 size={14} />
-                  </button>
+                  {/* Progress bar */}
+                  <div className="w-16 h-1.5 bg-card rounded-full overflow-hidden shrink-0">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${krPct}%`,
+                        backgroundColor: kr.status === "done" ? "var(--color-accent-success)" : "var(--color-accent-primary)",
+                      }}
+                    />
+                  </div>
+
+                  {/* Hover actions */}
+                  <div className="hidden group-hover:flex items-center gap-1">
+                    <button
+                      onClick={() => handlePushToProject(kr.id, kr.title)}
+                      className="text-[0.625rem] text-text-muted hover:text-accent-primary px-1"
+                      title="Push to Project"
+                    >
+                      → Proj
+                    </button>
+                    <button
+                      onClick={() => handlePushToTask(kr.id, kr.title)}
+                      className="text-[0.625rem] text-text-muted hover:text-accent-primary px-1"
+                      title="Push to Task"
+                    >
+                      → Task
+                    </button>
+                    <button
+                      onClick={() =>
+                        setLinkSearch({ krId: kr.id, type: "project", query: "" })
+                      }
+                      className="text-[0.625rem] text-text-muted hover:text-accent-primary px-1"
+                      title="Link existing entity"
+                    >
+                      Link
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await updateGoal.mutateAsync({ id: kr.id, data: { archived_at: new Date().toISOString() } });
+                          toast("Key result removed", "success");
+                        } catch {
+                          toast("Failed to remove", "error");
+                        }
+                      }}
+                      className="text-[0.625rem] text-text-muted hover:text-accent-danger px-1"
+                      title="Delete key result"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Add KR inline */}
             {addingKR ? (
@@ -558,7 +586,7 @@ export default function GoalsPage() {
   const filteredGoals = useMemo(() => {
     const allGoals = (goals ?? []).filter((g: any) => g.kind === "goal");
     if (selectedHorizon === "annual") return allGoals;
-    return allGoals.filter((g: any) => g.horizon === selectedHorizon);
+    return allGoals.filter((g: any) => g.horizon === selectedHorizon || g.horizon === "annual");
   }, [goals, selectedHorizon]);
 
   // Group by area
@@ -728,7 +756,7 @@ export default function GoalsPage() {
         <div className="text-center py-16 text-text-secondary">
           <p className="text-lg mb-2">No goals yet</p>
           <p className="text-sm text-text-muted">
-            Create your first goal using the + button below
+            Add your first goal to get started.
           </p>
         </div>
       )}
@@ -742,19 +770,16 @@ export default function GoalsPage() {
         return (
           <div key={area.value} className="mb-6">
             {/* Area header */}
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-center gap-3 mb-3 pb-2.5 border-b-2 border-border-default">
               <div
-                className="w-1 h-6 rounded-full"
+                className="w-1 h-7 rounded-sm"
                 style={{ backgroundColor: area.color }}
               />
-              <h2 className="text-sm font-semibold text-text-primary">
+              <h2 className="text-[1.125rem] font-bold tracking-tight text-text-primary flex-1">
                 {area.label}
               </h2>
-              <span className="text-xs text-text-muted">
-                {areaGoals.length} goal{areaGoals.length !== 1 ? "s" : ""}
-              </span>
-              <span className="text-xs text-text-secondary ml-auto">
-                {areaPct}%
+              <span className="text-xs text-text-muted font-medium">
+                {areaGoals.length} goal{areaGoals.length !== 1 ? "s" : ""} · {areaPct}% avg
               </span>
             </div>
 
@@ -763,9 +788,10 @@ export default function GoalsPage() {
               {areaGoals.map((goal: any) => {
                 const prog = progressMap[goal.id];
                 const pct = Math.round(prog?.effective_pct ?? 0);
-                const krCount = prog?.kr_count ?? 0;
-                const isExpanded = expandedKRs.has(goal.id);
                 const goalKRs = getKRsForGoal(goal.id);
+                const krCount = goalKRs.length;
+                const krDone = goalKRs.filter((kr: any) => kr.status === "done").length;
+                const isExpanded = expandedKRs.has(goal.id);
 
                 return (
                   <div
@@ -777,15 +803,15 @@ export default function GoalsPage() {
                       className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-card transition-colors"
                       onClick={() => setSelectedId(goal.id)}
                     >
-                      <ProgressRing value={pct} size={40} strokeWidth={3} />
+                      <ProgressRing value={pct} size={40} strokeWidth={3} color={area.color} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-text-primary truncate">
                           {goal.title}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
                           {krCount > 0 && (
-                            <span className="text-xs text-text-muted">
-                              {krCount} KR{krCount !== 1 ? "s" : ""}
+                            <span className="text-xs text-text-muted font-medium">
+                              {krDone} / {krCount} key results
                             </span>
                           )}
                           {goal.due_date && (
@@ -884,7 +910,7 @@ export default function GoalsPage() {
                 className="w-full flex items-center justify-center gap-1 py-2 border-2 border-dashed border-border-default rounded-md text-xs text-text-muted hover:text-accent-primary hover:border-accent-primary transition-colors"
               >
                 <Plus size={14} />
-                Add goal
+                Add goal to {area.label}...
               </button>
             </div>
           </div>
