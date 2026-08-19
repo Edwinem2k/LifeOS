@@ -36,21 +36,21 @@ const KANBAN_COLUMNS = [
 
 const PROJECT_FIELDS: FieldConfig[] = [
   {
-    key: "status", label: "Status", type: "select", inline: true,
+    key: "status", label: "Status", type: "select", inline: true, row: 1,
     options: PROJECT_STATUSES.map((s) => ({ value: s.value, label: s.label })),
     displayAs: "pill", pillType: "status",
   },
   {
-    key: "priority", label: "Priority", type: "select", inline: true,
+    key: "priority", label: "Priority", type: "select", inline: true, row: 1,
     options: PRIORITIES.map((p) => ({ value: p.value, label: p.label })),
     displayAs: "pill", pillType: "priority",
   },
   {
-    key: "area", label: "Area", type: "select", inline: true,
+    key: "area", label: "Area", type: "select", inline: true, row: 1,
     options: LIFE_AREAS.map((a) => ({ value: a.value, label: a.label })),
     displayAs: "pill", pillType: "area",
   },
-  { key: "target_date", label: "Target Date", type: "date", inline: true },
+  { key: "target_date", label: "Target Date", type: "date", inline: true, row: 2 },
   { key: "description", label: "Description", type: "textarea" },
   { key: "current_status", label: "Current Status", type: "textarea" },
   { key: "next_steps", label: "Next Steps", type: "textarea" },
@@ -385,6 +385,12 @@ export default function ProjectsPage() {
           <QuickAdd
             placeholder="Add project..."
             onAdd={(name) => createProject.mutate({ name, status: "active", area: "work" } as any)}
+            onPlusClick={() => {
+              createProject.mutate(
+                { name: "New Project", status: "active", area: "work" } as any,
+                { onSuccess: (created: any) => setSelectedId(created.id) }
+              );
+            }}
           />
         </>
       ) : (

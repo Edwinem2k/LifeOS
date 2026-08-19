@@ -70,6 +70,13 @@ export function EditableCell({
     }
   }, [dropdownOpen, searchable]);
 
+  const filteredOptions = useMemo(() => {
+    if (!options) return [];
+    if (!searchQuery) return options;
+    const q = searchQuery.toLowerCase();
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, searchQuery]);
+
   async function handleSave() {
     setEditing(false);
     if (current === value) return;
@@ -87,12 +94,6 @@ export function EditableCell({
 
   // SELECT: single click opens custom dropdown with colored options
   if (type === "select" && options) {
-    const filteredOptions = useMemo(() => {
-      if (!searchQuery) return options;
-      const q = searchQuery.toLowerCase();
-      return options.filter((o) => o.label.toLowerCase().includes(q));
-    }, [options, searchQuery]);
-
     return (
       <div ref={dropdownRef} className={`relative ${className}`}>
         <div

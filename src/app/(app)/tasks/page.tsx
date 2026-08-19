@@ -169,23 +169,23 @@ function TasksPageInner() {
 
   const taskFields: FieldConfig[] = [
     {
-      key: "status", label: "Status", type: "select", inline: true,
+      key: "status", label: "Status", type: "select", inline: true, row: 1,
       options: TASK_STATUSES.map(s => ({ value: s.value, label: s.label })),
       displayAs: "pill", pillType: "status",
     },
     {
-      key: "priority", label: "Priority", type: "select", inline: true,
+      key: "priority", label: "Priority", type: "select", inline: true, row: 1,
       options: PRIORITIES.map(p => ({ value: p.value, label: p.label })),
       displayAs: "pill", pillType: "priority",
     },
     {
-      key: "area", label: "Area", type: "select", inline: true,
+      key: "area", label: "Area", type: "select", inline: true, row: 1,
       options: LIFE_AREAS.map(a => ({ value: a.value, label: a.label })),
       displayAs: "pill", pillType: "area",
     },
-    { key: "deadline", label: "Deadline", type: "date", inline: true },
+    { key: "deadline", label: "Deadline", type: "date", inline: true, row: 2 },
     {
-      key: "project_id", label: "Project", type: "select", inline: true,
+      key: "project_id", label: "Project", type: "select", inline: true, row: 2,
       options: projectOptionsWithNone, searchable: true,
     },
     { key: "notes", label: "Notes", type: "textarea" },
@@ -473,6 +473,12 @@ function TasksPageInner() {
           ref={quickAddRef}
           placeholder="Add task..."
           onAdd={(title) => createTask.mutate({ title, status: "inbox" } as any)}
+          onPlusClick={() => {
+            createTask.mutate(
+              { title: "New Task", status: "inbox" } as any,
+              { onSuccess: (created: any) => setSelectedId(created.id) }
+            );
+          }}
         />
         </>
       ) : (

@@ -15,6 +15,7 @@ export type FieldConfig = {
   pillType?: "status" | "area" | "priority";
   searchable?: boolean;
   inline?: boolean;
+  row?: number;
 };
 
 export type StatConfig = {
@@ -76,35 +77,49 @@ export function FlyoutPanel({ title, titleField = "name", fields, data, stats, o
           </button>
         </div>
 
-        {/* Inline metadata fields (compact row under title) */}
-        {inlineFields.length > 0 && (
-          <div className="flex flex-wrap gap-x-4 gap-y-2 px-4 py-3 border-b border-border-default" style={{ backgroundColor: "#f0f0f0" }}>
-            {inlineFields.map((field) => (
-              <div key={field.key} className="flex items-center gap-1.5">
-                <span className="text-xs text-text-muted">{field.label}</span>
-                {field.type === "date" ? (
-                  <EditableCell
-                    value={data[field.key]?.toString() ?? ""}
-                    onSave={(v) => onSave(field.key, v)}
-                    type="date"
-                    placeholder="None"
-                  />
-                ) : (
-                  <EditableCell
-                    value={data[field.key]?.toString() ?? ""}
-                    onSave={(v) => onSave(field.key, v)}
-                    type={field.type}
-                    options={field.options}
-                    displayAs={field.displayAs}
-                    pillType={field.pillType}
-                    placeholder="None"
-                    searchable={field.searchable}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Inline metadata fields (compact rows under title) */}
+        {inlineFields.length > 0 && (() => {
+          const rows = new Map<number, FieldConfig[]>();
+          for (const f of inlineFields) {
+            const r = f.row ?? 0;
+            if (!rows.has(r)) rows.set(r, []);
+            rows.get(r)!.push(f);
+          }
+          return (
+            <div className="px-4 py-3 border-b border-border-default space-y-2" style={{ backgroundColor: "#f0f0f0" }}>
+              {Array.from(rows.entries())
+                .sort(([a], [b]) => a - b)
+                .map(([rowNum, rowFields]) => (
+                  <div key={rowNum} className="flex flex-wrap gap-x-4 gap-y-2">
+                    {rowFields.map((field) => (
+                      <div key={field.key} className="flex items-center gap-1.5">
+                        <span className="text-xs text-text-muted">{field.label}</span>
+                        {field.type === "date" ? (
+                          <EditableCell
+                            value={data[field.key]?.toString() ?? ""}
+                            onSave={(v) => onSave(field.key, v)}
+                            type="date"
+                            placeholder="None"
+                          />
+                        ) : (
+                          <EditableCell
+                            value={data[field.key]?.toString() ?? ""}
+                            onSave={(v) => onSave(field.key, v)}
+                            type={field.type}
+                            options={field.options}
+                            displayAs={field.displayAs}
+                            pillType={field.pillType}
+                            placeholder="None"
+                            searchable={field.searchable}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+            </div>
+          );
+        })()}
 
         {/* Stats bar */}
         {stats && stats.length > 0 && (
