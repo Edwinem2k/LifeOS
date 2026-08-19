@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LifeOS — Goals v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #faf8f4;
+    --card: #f2ede5;
+    --elevated: #ffffff;
+    --border: #e2ddd4;
+    --text-primary: #1a1816;
+    --text-secondary: #6b6560;
+    --text-muted: #9e9890;
+    --accent: #3b82f6;
+    --area-work: #3b82f6;
+    --area-health: #22c55e;
+    --area-money: #eab308;
+    --area-growth: #a855f7;
+    --area-relationships: #ec4899;
+    --area-play: #f97316;
+    --area-environment: #14b8a6;
+    --done: #22c55e;
+    --in-progress: #3b82f6;
+    --at-risk: #f59e0b;
+    --not-started: #d1d5db;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--page); color: var(--text-primary); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+
+  /* ─── Nav (matches app) ─── */
+  .nav {
+    border-bottom: 1px solid var(--border); background: var(--elevated);
+    padding: 0 2rem; height: 52px; display: flex; align-items: center; gap: 1.5rem;
+  }
+  .nav-logo { display: flex; align-items: center; gap: 0.5rem; }
+  .nav-logo svg { width: 22px; height: 22px; }
+  .nav-logo span { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.03em; }
+  .nav-links { display: flex; gap: 0.25rem; margin-left: 1.5rem; }
+  .nav-links a {
+    text-decoration: none; font-size: 0.8125rem; font-weight: 500;
+    color: var(--text-muted); padding: 0.375rem 0.75rem; border-radius: 4px; transition: all 0.15s;
+  }
+  .nav-links a:hover { color: var(--text-primary); background: var(--card); }
+  .nav-links a.active { color: var(--text-primary); background: var(--card); }
+
+  /* ─── Layout ─── */
+  .container { max-width: 960px; margin: 0 auto; padding: 2rem 2rem 4rem; }
+
+  /* ─── Header ─── */
+  .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 1.75rem; }
+  .page-header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; }
+  .page-header .subtitle { font-size: 0.8125rem; color: var(--text-muted); margin-top: 0.25rem; }
+  .horizon-tabs { display: flex; gap: 0.25rem; background: var(--card); border-radius: 6px; padding: 3px; }
+  .horizon-tabs button {
+    font-family: var(--font); font-size: 0.75rem; font-weight: 500;
+    padding: 0.375rem 0.875rem; border: none; border-radius: 4px;
+    cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.15s;
+  }
+  .horizon-tabs button:hover { color: var(--text-primary); }
+  .horizon-tabs button.active { background: var(--elevated); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+
+  /* ─── Progress Strip (with Total) ─── */
+  .overall-strip { display: flex; gap: 1px; background: var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 2.5rem; }
+  .overall-strip-item {
+    flex: 1; background: var(--elevated); padding: 0.875rem 0.75rem;
+    text-align: center; cursor: pointer; transition: background 0.15s;
+  }
+  .overall-strip-item:hover { background: var(--card); }
+  .overall-strip-item:first-child { border-radius: 8px 0 0 8px; }
+  .overall-strip-item:last-child { border-radius: 0 8px 8px 0; }
+  .overall-strip-item.total-item { background: var(--page); border-right: 2px solid var(--border); border-radius: 8px 0 0 8px; }
+  .overall-strip-item.total-item:hover { background: var(--card); }
+  .overall-strip-item .area-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 0.25rem; vertical-align: middle; }
+  .overall-strip-item .area-name { font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); }
+  .overall-strip-item .area-pct { font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-top: 0.25rem; font-variant-numeric: tabular-nums; }
+  .overall-strip-item .area-bar { height: 3px; border-radius: 2px; background: var(--card); margin-top: 0.5rem; overflow: hidden; }
+  .overall-strip-item .area-bar-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+
+  /* ─── Area Sections (prominent headers, NOT collapsible) ─── */
+  .area-section { margin-bottom: 2rem; }
+  .area-header {
+    display: flex; align-items: center; gap: 0.75rem;
+    margin-bottom: 0.75rem; padding: 0.625rem 0;
+    border-bottom: 2px solid var(--border);
+  }
+  .area-header .color-bar { width: 4px; height: 28px; border-radius: 2px; }
+  .area-header h2 { font-size: 1.125rem; font-weight: 700; letter-spacing: -0.02em; flex: 1; }
+  .area-header .area-summary { font-size: 0.75rem; color: var(--text-muted); font-weight: 500; }
+
+  /* ─── Goal Card ─── */
+  .goal-card {
+    background: var(--elevated); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 0.5rem; overflow: hidden; transition: box-shadow 0.15s;
+  }
+  .goal-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .goal-main { display: flex; align-items: center; padding: 0.875rem 1.25rem; gap: 1rem; cursor: pointer; }
+
+  /* Progress ring */
+  .progress-ring { position: relative; width: 40px; height: 40px; flex-shrink: 0; }
+  .progress-ring svg { width: 40px; height: 40px; transform: rotate(-90deg); }
+  .progress-ring .ring-bg { fill: none; stroke: var(--card); stroke-width: 3.5; }
+  .progress-ring .ring-fill { fill: none; stroke-width: 3.5; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
+  .progress-ring .ring-text {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 0.625rem; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums;
+  }
+
+  .goal-info { flex: 1; min-width: 0; }
+  .goal-title { font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.1875rem; }
+  .goal-meta { display: flex; align-items: center; gap: 0.75rem; font-size: 0.6875rem; color: var(--text-muted); }
+  .goal-meta .metric { font-weight: 500; color: var(--text-secondary); }
+
+  .goal-status-pill {
+    font-size: 0.625rem; font-weight: 600; padding: 0.1875rem 0.5rem;
+    border-radius: 3px; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .pill-done { background: #dcfce7; color: #166534; }
+  .pill-in-progress { background: #dbeafe; color: #1e40af; }
+  .pill-on-track { background: #dcfce7; color: #166534; }
+  .pill-at-risk { background: #fef3c7; color: #92400e; }
+  .pill-not-started { background: #f3f4f6; color: #6b7280; }
+
+  /* ─── Chevron toggle for KRs ─── */
+  .kr-toggle {
+    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); cursor: pointer; flex-shrink: 0; transition: transform 0.2s;
+  }
+  .kr-toggle.collapsed { transform: rotate(-90deg); }
+
+  /* ─── Key Results ─── */
+  .key-results { border-top: 1px solid var(--border); background: #f5f5f4; }
+  .kr-item {
+    display: flex; align-items: center; padding: 0.625rem 1.25rem 0.625rem 4.25rem;
+    gap: 0.75rem; border-bottom: 1px solid rgba(0,0,0,0.04); font-size: 0.8125rem;
+  }
+  .kr-item:last-child { border-bottom: none; }
+  .kr-check {
+    width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border);
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  }
+  .kr-check.done { background: var(--done); border-color: var(--done); }
+  .kr-check.done svg { display: block; }
+  .kr-check svg { display: none; }
+  .kr-check.partial { border-color: var(--in-progress); }
+  .kr-title { flex: 1; color: var(--text-primary); }
+  .kr-title.completed { text-decoration: line-through; color: var(--text-muted); }
+  .kr-progress-bar { width: 80px; height: 4px; background: #e5e5e4; border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+  .kr-progress-bar-fill { height: 100%; border-radius: 2px; }
+  .kr-value { font-size: 0.6875rem; font-weight: 600; color: var(--text-secondary); min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+  .kr-links { display: flex; gap: 0.375rem; flex-shrink: 0; }
+  .kr-link-tag {
+    font-size: 0.5625rem; font-weight: 500; padding: 0.125rem 0.375rem;
+    border-radius: 3px; background: var(--card); color: var(--text-secondary);
+    border: 1px solid var(--border); text-decoration: none; cursor: pointer; transition: all 0.15s;
+  }
+  .kr-link-tag:hover { background: var(--elevated); border-color: var(--accent); color: var(--accent); }
+  .kr-link-tag .link-icon { font-size: 0.5rem; margin-right: 0.1875rem; opacity: 0.6; }
+
+  /* ─── Add Goal ─── */
+  .add-goal-row {
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.625rem 1.25rem;
+    color: var(--text-muted); font-size: 0.8125rem; cursor: pointer;
+    border-radius: 6px; border: 1px dashed var(--border); margin-top: 0.375rem; transition: all 0.15s;
+  }
+  .add-goal-row:hover { background: var(--elevated); color: var(--text-secondary); border-color: var(--text-muted); }
+
+  /* ─── Flyout Panel Preview ─── */
+  .flyout-overlay {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 480px;
+    background: var(--elevated); border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px rgba(0,0,0,0.08); padding: 0; z-index: 1000;
+    display: none; flex-direction: column;
+  }
+  .flyout-overlay.show { display: flex; }
+  .flyout-header {
+    padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0.75rem;
+  }
+  .flyout-header .close-btn {
+    width: 28px; height: 28px; border: none; background: var(--card);
+    border-radius: 4px; cursor: pointer; font-size: 1rem; color: var(--text-muted);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .flyout-header .flyout-title-input {
+    flex: 1; font-size: 1.125rem; font-weight: 600; border: none; background: transparent;
+    font-family: var(--font); color: var(--text-primary); outline: none;
+  }
+  .flyout-meta-row {
+    display: flex; gap: 0.75rem; padding: 0.75rem 1.5rem;
+    background: #f9f8f6; border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .flyout-meta-field { display: flex; flex-direction: column; gap: 0.25rem; min-width: 100px; }
+  .flyout-meta-field label { font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+  .flyout-meta-field .field-value {
+    font-size: 0.8125rem; color: var(--text-primary); padding: 0.25rem 0.5rem;
+    background: var(--elevated); border: 1px solid var(--border); border-radius: 4px;
+    cursor: pointer;
+  }
+  .flyout-body { padding: 1.25rem 1.5rem; flex: 1; overflow-y: auto; }
+  .flyout-section { margin-bottom: 1.25rem; }
+  .flyout-section h4 { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 0.5rem; }
+  .flyout-textarea {
+    width: 100%; min-height: 80px; border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.75rem; font-family: var(--font); font-size: 0.8125rem; resize: vertical;
+    background: var(--page); color: var(--text-primary);
+  }
+  .flyout-kr-list { list-style: none; }
+  .flyout-kr-item {
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(0,0,0,0.04); font-size: 0.8125rem;
+  }
+  .flyout-add-kr {
+    display: flex; align-items: center; gap: 0.375rem; padding: 0.5rem 0;
+    font-size: 0.8125rem; color: var(--accent); cursor: pointer; font-weight: 500;
+  }
+  .flyout-link-section { margin-top: 0.75rem; }
+  .flyout-link-row {
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0;
+    font-size: 0.8125rem;
+  }
+  .flyout-link-btn {
+    display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.625rem;
+    font-size: 0.75rem; color: var(--accent); cursor: pointer; font-weight: 500;
+    border: 1px dashed var(--accent); border-radius: 4px; background: transparent;
+    font-family: var(--font);
+  }
+
+  /* Toggle flyout */
+  .show-flyout-btn {
+    position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent);
+    color: white; border: none; padding: 0.625rem 1.25rem; border-radius: 8px;
+    font-family: var(--font); font-size: 0.8125rem; font-weight: 600;
+    cursor: pointer; box-shadow: 0 4px 12px rgba(59,130,246,0.3); z-index: 999;
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo">
+    <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="5">
+      <polygon points="50,5 5,90 95,90"/><circle cx="50" cy="58" r="18"/><line x1="50" y1="5" x2="50" y2="90"/>
+    </svg>
+    <span>LifeOS</span>
+  </div>
+  <div class="nav-links">
+    <a href="#">Today</a>
+    <a href="#">Tasks</a>
+    <a href="#">Projects</a>
+    <a href="#" class="active">Goals</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1>2026 Goals</h1>
+      <p class="subtitle">Set in January · Next review: 1 Oct 2026</p>
+    </div>
+    <div class="horizon-tabs">
+      <button class="active">Annual</button>
+      <button>Q1</button>
+      <button>Q2</button>
+      <button>Q3 ←</button>
+      <button>Q4</button>
+    </div>
+  </div>
+
+  <!-- Progress Strip with Total -->
+  <div class="overall-strip">
+    <div class="overall-strip-item total-item">
+      <div class="area-name">Total</div>
+      <div class="area-pct">60%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:60%;background:var(--text-primary)"></div></div>
+    </div>
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-work)"></span>Work</div>
+      <div class="area-pct">68%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:68%;background:var(--area-work)"></div></div>
+    </div>
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-health)"></span>Health</div>
+      <div class="area-pct">45%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:45%;background:var(--area-health)"></div></div>
+    </div>
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-money)"></span>Money</div>
+      <div class="area-pct">72%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:72%;background:var(--area-money)"></div></div>
+    </div>
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-growth)"></span>Growth</div>
+      <div class="area-pct">58%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:58%;background:var(--area-growth)"></div></div>
+    </div>
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-relationships)"></span>Relate</div>
+      <div class="area-pct">40%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:40%;background:var(--area-relationships)"></div></div>
+    </div>
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-play)"></span>Play</div>
+      <div class="area-pct">55%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:55%;background:var(--area-play)"></div></div>
+    </div>
+    <div class="overall-strip-item">
+      <div class="area-name"><span class="area-dot" style="background:var(--area-environment)"></span>Environ</div>
+      <div class="area-pct">82%</div>
+      <div class="area-bar"><div class="area-bar-fill" style="width:82%;background:var(--area-environment)"></div></div>
+    </div>
+  </div>
+
+  <!-- ═══ WORK ═══ -->
+  <div class="area-section">
+    <div class="area-header">
+      <div class="color-bar" style="background:var(--area-work)"></div>
+      <h2>Work</h2>
+      <span class="area-summary">3 goals · 68% avg</span>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main" onclick="toggleKR(this)">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16"/>
+            <circle class="ring-fill" cx="20" cy="20" r="16" style="stroke:var(--area-work);stroke-dasharray:100.53;stroke-dashoffset:32.17"/>
+          </svg>
+          <span class="ring-text">68%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Ship LifeOS to daily use</div>
+          <div class="goal-meta">
+            <span class="metric">6 / 8 key results</span>
+            <span>Due: Dec 31</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-in-progress">In Progress</span>
+        <div class="kr-toggle"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg></div>
+      </div>
+      <div class="key-results">
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Build core task management UI</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+          <div class="kr-links"><span class="kr-link-tag"><span class="link-icon">◆</span> LifeOS Build</span></div>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Set up Supabase + auth + RLS</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check done"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2"><path d="M2 5l2 2 4-4"/></svg></div>
+          <span class="kr-title completed">Projects + kanban views working</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:100%;background:var(--done)"></div></div>
+          <span class="kr-value">100%</span>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check partial"></div>
+          <span class="kr-title">Deploy to Vercel + custom domain</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:40%;background:var(--in-progress)"></div></div>
+          <span class="kr-value">40%</span>
+          <div class="kr-links"><span class="kr-link-tag"><span class="link-icon">☐</span> Vercel setup</span></div>
+        </div>
+        <div class="kr-item">
+          <div class="kr-check"></div>
+          <span class="kr-title">Use LifeOS daily for 30 consecutive days</span>
+          <div class="kr-progress-bar"><div class="kr-progress-bar-fill" style="width:0%"></div></div>
+          <span class="kr-value">0 / 30</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main" onclick="toggleKR(this)">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16"/>
+            <circle class="ring-fill" cx="20" cy="20" r="16" style="stroke:var(--area-work);stroke-dasharray:100.53;stroke-dashoffset:60.32"/>
+          </svg>
+          <span class="ring-text">40%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Land 3 consulting clients</div>
+          <div class="goal-meta">
+            <span class="metric">1 / 3 clients</span>
+            <span>Due: Dec 31</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-at-risk">At Risk</span>
+        <div class="kr-toggle collapsed"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg></div>
+      </div>
+      <!-- KRs hidden by default for this card -->
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main" onclick="toggleKR(this)">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16"/>
+            <circle class="ring-fill" cx="20" cy="20" r="16" style="stroke:var(--area-work);stroke-dasharray:100.53;stroke-dashoffset:14.07"/>
+          </svg>
+          <span class="ring-text">86%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Grow Piglet in Bed UK revenue 20%</div>
+          <div class="goal-meta">
+            <span class="metric">£186k / £220k</span>
+            <span>Due: Dec 31</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-on-track">On Track</span>
+        <div class="kr-toggle collapsed"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg></div>
+      </div>
+    </div>
+
+    <div class="add-goal-row" onclick="showFlyout()">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 2v10M2 7h10"/></svg>
+      Add goal to Work...
+    </div>
+  </div>
+
+  <!-- ═══ HEALTH ═══ -->
+  <div class="area-section">
+    <div class="area-header">
+      <div class="color-bar" style="background:var(--area-health)"></div>
+      <h2>Health</h2>
+      <span class="area-summary">2 goals · 45% avg</span>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main" onclick="toggleKR(this)">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16"/>
+            <circle class="ring-fill" cx="20" cy="20" r="16" style="stroke:var(--area-health);stroke-dasharray:100.53;stroke-dashoffset:50.27"/>
+          </svg>
+          <span class="ring-text">50%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Run a half marathon</div>
+          <div class="goal-meta">
+            <span class="metric">3 / 5 milestones</span>
+            <span>Due: Nov 15</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-in-progress">In Progress</span>
+        <div class="kr-toggle collapsed"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg></div>
+      </div>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main" onclick="toggleKR(this)">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16"/>
+            <circle class="ring-fill" cx="20" cy="20" r="16" style="stroke:var(--area-health);stroke-dasharray:100.53;stroke-dashoffset:60.32"/>
+          </svg>
+          <span class="ring-text">40%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Meditate 5x per week consistently</div>
+          <div class="goal-meta">
+            <span class="metric">16 / 40 weeks</span>
+            <span>Due: Dec 31</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-at-risk">At Risk</span>
+        <div class="kr-toggle collapsed"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg></div>
+      </div>
+    </div>
+
+    <div class="add-goal-row">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 2v10M2 7h10"/></svg>
+      Add goal to Health...
+    </div>
+  </div>
+
+  <!-- ═══ MONEY ═══ -->
+  <div class="area-section">
+    <div class="area-header">
+      <div class="color-bar" style="background:var(--area-money)"></div>
+      <h2>Money</h2>
+      <span class="area-summary">2 goals · 72% avg</span>
+    </div>
+
+    <div class="goal-card">
+      <div class="goal-main" onclick="toggleKR(this)">
+        <div class="progress-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16"/>
+            <circle class="ring-fill" cx="20" cy="20" r="16" style="stroke:var(--area-money);stroke-dasharray:100.53;stroke-dashoffset:14.07"/>
+          </svg>
+          <span class="ring-text">86%</span>
+        </div>
+        <div class="goal-info">
+          <div class="goal-title">Build 6-month emergency fund</div>
+          <div class="goal-meta">
+            <span class="metric">€12.9k / €15k</span>
+            <span>Due: Dec 31</span>
+          </div>
+        </div>
+        <span class="goal-status-pill pill-on-track">On Track</span>
+        <div class="kr-toggle collapsed"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg></div>
+      </div>
+    </div>
+
+    <div class="add-goal-row">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 2v10M2 7h10"/></svg>
+      Add goal to Money...
+    </div>
+  </div>
+
+</div>
+
+<!-- Flyout Panel Preview -->
+<div class="flyout-overlay" id="flyout">
+  <div class="flyout-header">
+    <button class="close-btn" onclick="hideFlyout()">×</button>
+    <input class="flyout-title-input" value="New Goal" placeholder="Goal title...">
+  </div>
+  <div class="flyout-meta-row">
+    <div class="flyout-meta-field">
+      <label>Status</label>
+      <div class="field-value" style="display:inline-flex;align-items:center;gap:0.375rem"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--not-started)"></span> Not Started</div>
+    </div>
+    <div class="flyout-meta-field">
+      <label>Area</label>
+      <div class="field-value">Work</div>
+    </div>
+    <div class="flyout-meta-field">
+      <label>Horizon</label>
+      <div class="field-value">Annual</div>
+    </div>
+    <div class="flyout-meta-field">
+      <label>Due Date</label>
+      <div class="field-value">Dec 31, 2026</div>
+    </div>
+  </div>
+  <div class="flyout-body">
+    <div class="flyout-section">
+      <h4>Progress</h4>
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.5rem">
+        <div style="font-size:0.8125rem;color:var(--text-secondary)">Target value</div>
+        <div class="field-value" style="padding:0.25rem 0.5rem;background:var(--elevated);border:1px solid var(--border);border-radius:4px;font-size:0.8125rem">100</div>
+        <div style="font-size:0.8125rem;color:var(--text-secondary)">Current</div>
+        <div class="field-value" style="padding:0.25rem 0.5rem;background:var(--elevated);border:1px solid var(--border);border-radius:4px;font-size:0.8125rem">0</div>
+        <div style="font-size:0.8125rem;color:var(--text-secondary)">Unit</div>
+        <div class="field-value" style="padding:0.25rem 0.5rem;background:var(--elevated);border:1px solid var(--border);border-radius:4px;font-size:0.8125rem">%</div>
+      </div>
+    </div>
+    <div class="flyout-section">
+      <h4>Key Results</h4>
+      <ul class="flyout-kr-list">
+        <li class="flyout-kr-item">
+          <div class="kr-check" style="width:14px;height:14px"></div>
+          <span style="flex:1">First key result here</span>
+          <span style="font-size:0.6875rem;color:var(--text-muted)">0%</span>
+        </li>
+      </ul>
+      <div class="flyout-add-kr">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 1v10M1 6h10"/></svg>
+        Add key result
+      </div>
+    </div>
+    <div class="flyout-section">
+      <h4>Linked Items</h4>
+      <div class="flyout-link-section">
+        <div class="flyout-link-row" style="color:var(--text-muted);font-size:0.75rem">No linked projects or tasks yet</div>
+        <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+          <button class="flyout-link-btn">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 1v10M1 6h10"/></svg>
+            Link project
+          </button>
+          <button class="flyout-link-btn">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 1v10M1 6h10"/></svg>
+            Link task
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="flyout-section">
+      <h4>Notes</h4>
+      <textarea class="flyout-textarea" placeholder="Add notes about this goal..."></textarea>
+    </div>
+  </div>
+</div>
+
+<button class="show-flyout-btn" onclick="showFlyout()">Preview: Goal Flyout Panel →</button>
+
+<script>
+function toggleKR(el) {
+  const card = el.closest('.goal-card');
+  const kr = card.querySelector('.key-results');
+  const toggle = card.querySelector('.kr-toggle');
+  if (kr) {
+    kr.style.display = kr.style.display === 'none' ? 'block' : 'none';
+    toggle?.classList.toggle('collapsed');
+  }
+}
+function showFlyout() {
+  document.getElementById('flyout').classList.add('show');
+}
+function hideFlyout() {
+  document.getElementById('flyout').classList.remove('show');
+}
+</script>
+</body>
+</html>
