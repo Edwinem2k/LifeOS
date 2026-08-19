@@ -823,12 +823,9 @@ export default function GoalsPage() {
                 className="w-1 h-7 rounded-sm"
                 style={{ backgroundColor: area.color }}
               />
-              <h2 className="text-[1.125rem] font-bold tracking-tight text-text-primary flex-1">
+              <h2 className="text-[1.125rem] font-bold tracking-tight text-text-primary">
                 {area.label}
               </h2>
-              <span className="text-xs text-text-muted font-medium">
-                {areaGoals.length} goal{areaGoals.length !== 1 ? "s" : ""} · {areaPct}% avg
-              </span>
               <button
                 onClick={() => handleQuickAdd(area.value)}
                 className="p-1 rounded text-text-muted hover:text-accent-primary hover:bg-card transition-colors"
@@ -836,6 +833,9 @@ export default function GoalsPage() {
               >
                 <Plus size={16} />
               </button>
+              <span className="text-xs text-text-muted font-medium ml-auto">
+                {areaGoals.length} goal{areaGoals.length !== 1 ? "s" : ""} · {areaPct}% avg
+              </span>
             </div>
 
             {/* Goal cards */}
