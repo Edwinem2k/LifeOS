@@ -78,6 +78,19 @@ export async function getLinksForKR(krId: string) {
   return data ?? [];
 }
 
+export async function getLinksForKRs(krIds: string[]) {
+  if (krIds.length === 0) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("links")
+    .select("*")
+    .eq("src_type", "key_result")
+    .in("src_id", krIds)
+    .eq("relation", "contributes_to");
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function getGoalForEntity(entityType: string, entityId: string) {
   const supabase = createClient();
   const { data: link, error: linkError } = await supabase

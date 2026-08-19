@@ -14,7 +14,7 @@ import {
 } from "@/hooks/use-goals";
 import { useGoalProgress } from "@/hooks/use-goal-progress";
 import { useAreaProgress } from "@/hooks/use-area-progress";
-import { useLinkKR, useUnlinkKR } from "@/hooks/use-links";
+import { useLinkKR, useUnlinkKR, useLinksForKRs } from "@/hooks/use-links";
 import { useProjects } from "@/hooks/use-projects";
 import { useTasks } from "@/hooks/use-tasks";
 import { ProgressRing } from "@/components/app/ProgressRing";
@@ -46,6 +46,19 @@ function GoalFlyout({
   const { data: projects } = useProjects();
   const { data: tasks } = useTasks();
   const { data: keyResultsData } = useKeyResults(goal.id);
+
+  // Fetch links for all KRs to know which are linked
+  const krIds = useMemo(
+    () => (goals ?? [])
+      .filter((g: any) => g.kind === "key_result" && g.parent_goal_id === goal.id)
+      .map((g: any) => g.id),
+    [goals, goal.id]
+  );
+  const { data: krLinks } = useLinksForKRs(krIds);
+  const linkedKRIds = useMemo(() => {
+    if (!krLinks) return new Set<string>();
+    return new Set(krLinks.map((l: any) => l.src_id));
+  }, [krLinks]);
 
   const [title, setTitle] = useState(goal.title);
   const [notes, setNotes] = useState(goal.notes ?? "");
@@ -336,7 +349,7 @@ function GoalFlyout({
                     <Check size={12} />
                   </button>
 
-                  {/* Title */}
+                  {/* Title + linked badge */}
                   <span
                     className={`flex-1 text-sm ${
                       kr.status === "done"
@@ -345,6 +358,11 @@ function GoalFlyout({
                     }`}
                   >
                     {kr.title}
+                    {linkedKRIds.has(kr.id) && (
+                      <span className="ml-1.5 text-[0.6rem] px-1 py-0.5 bg-card border border-border-default rounded text-text-muted align-middle">
+                        Linked
+                      </span>
+                    )}
                   </span>
 
                   {/* Progress bar */}
@@ -358,31 +376,35 @@ function GoalFlyout({
                     />
                   </div>
 
-                  {/* Hover actions */}
+                  {/* Hover actions — only show push/link for unlinked KRs */}
                   <div className="hidden group-hover:flex items-center gap-1">
-                    <button
-                      onClick={() => handlePushToProject(kr.id, kr.title)}
-                      className="text-[0.625rem] text-text-muted hover:text-accent-primary px-1"
-                      title="Push to Project"
-                    >
-                      → Proj
-                    </button>
-                    <button
-                      onClick={() => handlePushToTask(kr.id, kr.title)}
-                      className="text-[0.625rem] text-text-muted hover:text-accent-primary px-1"
-                      title="Push to Task"
-                    >
-                      → Task
-                    </button>
-                    <button
-                      onClick={() =>
-                        setLinkSearch({ krId: kr.id, type: "project", query: "" })
-                      }
-                      className="text-[0.625rem] text-text-muted hover:text-accent-primary px-1"
-                      title="Link existing entity"
-                    >
-                      Link
-                    </button>
+                    {!linkedKRIds.has(kr.id) && (
+                      <>
+                        <button
+                          onClick={() => handlePushToProject(kr.id, kr.title)}
+                          className="text-[0.625rem] text-text-muted hover:text-accent-primary px-1"
+                          title="Push to Project"
+                        >
+                          → Proj
+                        </button>
+                        <button
+                          onClick={() => handlePushToTask(kr.id, kr.title)}
+                          className="text-[0.625rem] text-text-muted hover:text-accent-primary px-1"
+                          title="Push to Task"
+                        >
+                          → Task
+                        </button>
+                        <button
+                          onClick={() =>
+                            setLinkSearch({ krId: kr.id, type: "project", query: "" })
+                          }
+                          className="text-[0.625rem] text-text-muted hover:text-accent-primary px-1"
+                          title="Link existing entity"
+                        >
+                          Link
+                        </button>
+                      </>
+                    )}
                     <button
                       onClick={async () => {
                         try {
@@ -806,11 +828,15 @@ export default function GoalsPage() {
                           {goal.title}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          {krCount > 0 && (
+                          {krCount > 0 ? (
                             <span className="text-xs text-text-muted font-medium">
                               {krDone} / {krCount} key results
                             </span>
-                          )}
+                          ) : goal.target_value ? (
+                            <span className="text-xs text-text-muted font-medium">
+                              {goal.current_value ?? 0} / {goal.target_value} {goal.unit ?? ""}
+                            </span>
+                          ) : null}
                           {goal.due_date && (
                             <span className="text-xs text-text-muted">
                               Due{" "}
@@ -826,7 +852,7 @@ export default function GoalsPage() {
                         {goal.status && (
                           <StatusPill value={goal.status} type="status" />
                         )}
-                        {krCount > 0 && (
+                        {krCount > 0 ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -841,6 +867,8 @@ export default function GoalsPage() {
                               }`}
                             />
                           </button>
+                        ) : (
+                          <span className="w-[26px]" />
                         )}
                       </div>
                     </div>

@@ -48,6 +48,7 @@ export function useUpdateGoal() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["goals"] });
       qc.invalidateQueries({ queryKey: ["goal-progress"] });
+      qc.invalidateQueries({ queryKey: ["area-progress"] });
     },
   });
 }

@@ -1,11 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getLinksFor, linkKRToEntity, unlinkKR as unlinkKRService } from "@/services/links";
+import { getLinksFor, getLinksForKRs, linkKRToEntity, unlinkKR as unlinkKRService } from "@/services/links";
 
 export function useLinks(entityType: string, entityId: string) {
   return useQuery({
     queryKey: ["links", entityType, entityId],
     queryFn: () => getLinksFor(entityType, entityId),
     enabled: !!entityId,
+  });
+}
+
+export function useLinksForKRs(krIds: string[]) {
+  return useQuery({
+    queryKey: ["links", "krs", krIds],
+    queryFn: () => getLinksForKRs(krIds),
+    enabled: krIds.length > 0,
   });
 }
 
