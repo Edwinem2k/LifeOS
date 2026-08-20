@@ -1525,7 +1525,8 @@ export function useHabitLogsFor(habitId: string | null) {
   });
 }
 
-/** Spec §7.1 item 5 — powers the flyout's Linked goal block. */
+/** Spec §7.1 item 5 — powers the flyout's Linked goal block.
+ *  Requires the widened select in Step 1a below. */
 export function useGoalForHabit(habitId: string | null) {
   return useQuery({
     queryKey: ["goal-for-habit", habitId],
@@ -1641,6 +1642,30 @@ export function useUnlogHabit() {
 }
 ```
 
+- [ ] **Step 1a: Widen `getGoalForEntity`'s select**
+
+`src/services/links.ts:113` currently does `.select("id, title")`. Spec §6 requires the
+flyout's Linked goal block to show "Goal name, area **and horizon**", and both columns exist
+(`001_core_tables.sql:138-139`) — without this the subtitle renders as an empty string and
+nothing in Task 20 would catch it.
+
+```ts
+    .select("id, title, area, horizon")
+```
+
+Risk-free: `getGoalForEntity` has no other callers anywhere in `src/`.
+
+- [ ] **Step 1b: Invalidate the new key when a link changes**
+
+`useLinkKR` and `useUnlinkKR` (`src/hooks/use-links.ts:20-32`) invalidate `goals`,
+`goal-progress`, `area-progress`, `links` and `key-results` — none of which touches
+`["goal-for-habit"]`, so linking on the Goals page leaves an already-open habit flyout stale.
+Add to both mutations' `onSuccess`:
+
+```ts
+      qc.invalidateQueries({ queryKey: ["goal-for-habit"] });
+```
+
 - [ ] **Step 2: Fix the one existing call site**
 
 The mutate signature changes from a bare id to `{ habitId, date? }`. There is exactly one caller, at `src/app/(app)/page.tsx:101`.
@@ -1662,7 +1687,7 @@ Expected: clean.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/hooks/use-habits.ts "src/app/(app)/page.tsx"
+git add src/hooks/use-habits.ts src/hooks/use-links.ts src/services/links.ts         "src/app/(app)/page.tsx"
 git commit -m "feat: add habits hooks with two-cache optimistic log/unlog"
 ```
 
@@ -1679,6 +1704,7 @@ git commit -m "feat: add habits hooks with two-cache optimistic log/unlog"
 - Modify: `src/components/app/StatusPill.tsx`
 - Modify: `src/components/app/EditableCell.tsx`
 - Modify: `src/components/app/FlyoutPanel.tsx`
+- Modify: `src/components/app/FilterBar.tsx` (a fourth declaration of the same narrow union, at line 44)
 
 - [ ] **Step 1: Add the option lists and colour maps to `constants.ts`**
 
@@ -1734,7 +1760,7 @@ export function getPillColor(value: string, type: PillType): string {
 
 - [ ] **Step 3: Widen the three consumers**
 
-In `StatusPill.tsx`, `EditableCell.tsx:15` and `FlyoutPanel.tsx:15`, replace the inline union with the shared type:
+In `StatusPill.tsx`, `EditableCell.tsx:15`, `FlyoutPanel.tsx:15` and `FilterBar.tsx:44`, replace the inline union with the shared type:
 
 ```ts
 import { type PillType } from "@/lib/constants";
@@ -2003,8 +2029,12 @@ export function SchedulePicker({ value, onSave }: Props) {
   const [days, setDays] = useState<number[]>(norm.kind === "days" ? norm.days : [1, 3, 5]);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Re-sync when the habit prop changes underneath us.
+  // Re-sync when the habit prop changes underneath us — but NEVER while the
+  // popover is open. TanStack refetches ["habits"] on window focus by default,
+  // and habit.schedule is a new object identity each time, so without this
+  // guard a background refetch wipes an edit in progress.
   useEffect(() => {
+    if (open) return;
     const n = normalizeSchedule(value);
     setKind(n.kind);
     if (n.kind === "perWeek") setCount(n.count);
@@ -2847,7 +2877,12 @@ A habit is never *done* — it is ongoing. For a habit-backed KR, hide the check
 Inside the `krs.map((kr) => ...)` body, before the existing check-circle JSX at lines 341-378:
 
 ```tsx
-const habitLink = krLinks.find(
+// `krLinks` is undefined while useLinksForKRs is in flight, and `krs` renders
+// from the already-loaded `goals` — so on the flyout's first paint this runs
+// against undefined. The existing code guards it the same way at line 60.
+// TypeScript will NOT catch this: getLinksForKRs returns untyped `data ?? []`,
+// so krLinks infers as `any`.
+const habitLink = (krLinks ?? []).find(
   (l: any) => l.src_id === kr.id && l.dst_type === "habit",
 );
 const linkedHabit = habitLink
@@ -2887,7 +2922,12 @@ Then render:
     </span>
   </div>
 ) : (
-  /* existing check-circle + progress-bar JSX, unchanged */
+  <>
+    {/* The existing THREE siblings from lines 341-378, unchanged: the
+        check-circle <button>, the title <span>, and the progress-bar <div>.
+        They must be wrapped in a fragment — a ternary branch takes one
+        expression, and as written they are three. */}
+  </>
 )}
 ```
 
@@ -2930,6 +2970,7 @@ circle, because a habit is never done."
 - [ ] "On track" counts a per-week habit that met its target earlier in the week
 - [ ] With only break habits visible, "On track" and "At risk" read `—` with the "no build habits" caption
 - [ ] With no habits, the empty state renders and the QuickAdd field accepts a name
+      (auto-focusing it is deferred — see the table below)
 - [ ] Filter to an area with no habits; "No habits match this filter" appears, distinct from the empty state
 - [ ] Create a habit from QuickAdd; the flyout opens with the title focused
 - [ ] Confirm exactly **one** nav bar on `/habits` and padding matching `/goals`
@@ -2957,6 +2998,7 @@ Recorded so they are decisions rather than omissions:
 |---|---|
 | Component tests for the row, heatmap and optimistic path | Needs jsdom + React Testing Library, which the app has never had. Task 20 covers it manually. |
 | **"Push to Habit"** — creating a habit from a manual KR | Spec §7.1 names it alongside the `→ Proj` / `→ Task` buttons at `goals/page.tsx:387,394`. Link-in works; push-out is a second flow on an already 968-line file. Ships separately. |
+| **Auto-focusing QuickAdd in the empty state** | Spec §12 asks for it. `QuickAdd` is a `forwardRef`, so it is a ref plus a `focus()` — but focus-stealing on mount is a real annoyance if the user arrived to read rather than add. Left to a follow-up rather than half-wired. |
 | **Unlinking from the habit flyout** | Spec §6 lists the block as "Link / unlink", but all linking originates from the Goals side (§7.1). The flyout displays the link and points at where to manage it. |
 | Rewriting the `habit_stats` view | Left untouched for the MCP server. This page simply does not read it. |
 | Today page `item_details.streak` bug | `page.tsx:113` reads a key `today_agenda` never emits, so habit streaks silently never render there. Pre-existing and unrelated. |
