@@ -2,8 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import './supabase.js'; // Triggers startup validation
 
-// Tool imports are added as each tool file is built
-// import { registerTaskTools } from './tools/tasks.js';
+import { registerTaskTools } from './tools/tasks.js';
 
 const server = new McpServer({
   name: 'lifeos',
@@ -11,7 +10,7 @@ const server = new McpServer({
 });
 
 // Tool registrations
-// registerTaskTools(server);
+registerTaskTools(server);
 
 async function main() {
   const transport = new StdioServerTransport();
