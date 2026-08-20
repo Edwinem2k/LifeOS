@@ -18,6 +18,12 @@
 -- as a standard column on every table, so this makes links conform rather than
 -- carving out an exception, and the existing trigger becomes correct as written.
 
+-- Order matters. The trigger is dropped FIRST because it is a BEFORE UPDATE
+-- trigger that assigns new.updated_at = now(): left in place it fires on the
+-- backfill below and overwrites every row with this migration's run time,
+-- destroying the created_at history we are trying to preserve.
+drop trigger if exists trg_links_updated_at on links;
+
 -- Added nullable first so the backfill can distinguish "never updated" from now().
 alter table links add column if not exists updated_at timestamptz;
 
@@ -28,9 +34,6 @@ update links set updated_at = created_at where updated_at is null;
 alter table links alter column updated_at set default now();
 alter table links alter column updated_at set not null;
 
--- Recreated so this migration is self-contained and idempotent, regardless of
--- whether 001's DO block ran fully.
-drop trigger if exists trg_links_updated_at on links;
 create trigger trg_links_updated_at
   before update on links
   for each row execute function set_updated_at();
