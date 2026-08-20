@@ -451,7 +451,9 @@ The core abstraction. Two separate concerns govern it: **window trimming** decid
 
 - [ ] **Step 1: Add the failing tests**
 
-Reuse the shared fixtures from Task 3 — do **not** redeclare them.
+Add `periods` to the existing import at the top of the test file, then append the blocks
+below. Reuse the shared fixtures from Task 3 — do **not** redeclare them. (Forgetting the
+import gives a `ReferenceError`, which looks deceptively like the expected red-test failure.)
 
 ```ts
 describe("periods — daily, build", () => {
@@ -769,7 +771,8 @@ decide what is required, what is clickable and how each dot is painted.
 
 - [ ] **Step 1: Add the failing tests**
 
-Reuse the Task 3 fixtures.
+Add `computeStats` to the existing import, then append. Reuse the Task 3 fixtures — do
+**not** redeclare them.
 
 ```ts
 const daily = { kind: "daily" as const };
@@ -937,10 +940,12 @@ describe("computeStats — rate30d denominators (spec §9.2)", () => {
 
 describe("computeStats — strength (spec §9.2 parity)", () => {
   it("uses a NORMALISED weighted mean, not a zero-seeded recursion", () => {
-    // Pinned deliberately. A zero-seeded s = ax + (1-a)s gives ~45% for a
-    // 10-day-old perfect habit; the normalised form gives ~88%, and only the
-    // normalised form reproduces spec §2.4's "a habit at 90% reads about 84%
-    // each morning". Drift here would be invisible in production.
+    // Pinned deliberately. This fixture logs all ten days including today, so
+    // the normalised weighted mean scores it 100 while a zero-seeded
+    // s = ax + (1-a)s scores 48.7 — the > 80 bound is what discriminates.
+    // Only the normalised form reproduces spec §2.4's "a habit at 90% reads
+    // about 84% each morning" (which describes an UNLOGGED open period).
+    // Drift here would be invisible in production.
     const created = new Date(2026, 7, 11);
     const logs = Array.from({ length: 10 }, (_, i) =>
       ({ loggedAt: new Date(2026, 7, 11 + i, 12) }));
@@ -1144,7 +1149,8 @@ git commit -m "feat: add period scoring and the four habit statistics"
 
 - [ ] **Step 1: Add the failing tests**
 
-Reuse the Task 3 fixtures.
+Add `isRequiredOn`, `canBackfill` and `dotState` to the existing import, then append.
+Reuse the Task 3 fixtures — do **not** redeclare them.
 
 ```ts
 const MWF = { kind: "days" as const, days: [1, 3, 5] };
