@@ -1,7 +1,7 @@
 # Habits Page — Design Spec
 
 **Date:** 2026-08-20
-**Status:** Draft (rev 2 — after spec review)
+**Status:** Draft (rev 3 — after second spec review)
 **Mockup:** `mockups/habits-full.html`
 **Design review:** https://claude.ai/code/artifact/163f159d-b812-4f9e-8758-7eb95fe9449c
 **Branch:** `feat/habits-page` (off `main`)
@@ -129,33 +129,38 @@ boundary rather than in the picker.
 type NormalizedSchedule =
   | { kind: 'daily' }
   | { kind: 'days';    days: number[] }   // sorted, deduped, each 1..7, length 1..6
-  | { kind: 'perWeek'; count: number };   // integer 1..6
+  | { kind: 'perWeek'; count: number };   // integer 2..6
 
 function normalizeSchedule(raw: unknown): NormalizedSchedule
 ```
 
-Rules, all falling back to `{ kind: 'daily' }`:
+Every rule falls back to `{ kind: 'daily' }`:
 
 - null, non-object, malformed, or unrecognised `type`
 - `type: 'daily'` with no `days`, an empty `days`, or all seven days listed
-- `type: 'daily'` with `days` → keep integers in 1..7, dedupe, sort; empty after filtering → daily
-- `type: 'per_week'` with a non-numeric or absent `count` → daily
-- `type: 'per_week'` with `count >= 7` → daily (a 7×/week habit *is* daily)
-- `type: 'per_week'` with `count < 1` → daily
+- `type: 'daily'` with `days` → keep values passing
+  `Number.isInteger(d) && d >= 1 && d <= 7`, dedupe, sort; empty after filtering → daily
+- `type: 'per_week'` unless `Number.isInteger(count) && count >= 2 && count <= 6`
 
-This closes the `count: 9` case (target unreachable in a 7-day week, so `currentStreak`
-would be permanently 0) and the `count: 0` case (division by zero), neither of which the
-picker's 1–6 stepper can prevent for rows written by anything else.
+The `count` guard is written as a single positive predicate deliberately. Expressing it as
+two negative bounds (`count >= 7 → daily`, `count < 1 → daily`) lets `NaN` through both
+comparisons while still being `typeof 'number'`, producing a `perWeek` period with a NaN
+target that poisons `periodScore`, `rate30d` and `strength`. `Number.isInteger` rejects
+`NaN`, `Infinity` and `3.5` in one clause.
+
+`count: 1` normalises to daily rather than being kept: a once-a-week habit with no fixed day
+is expressible, but its streak and rate are identical to a `days` schedule with one entry
+and it complicates the picker for no gain. `count: 7` is daily by definition.
 
 ### 2.2 The generator
 
 ```ts
 type Period = {
-  start: Date;    // inclusive, local midnight
-  end: Date;      // exclusive, local midnight
+  start: Date;     // inclusive, local midnight
+  end: Date;       // exclusive, local midnight
   target: number;
-  actual: number; // distinct days logged within [start, end)
-  closed: boolean;// end <= now
+  actual: number;  // distinct days logged within [start, end)
+  closed: boolean; // end <= now
 };
 
 function periods(
@@ -169,19 +174,36 @@ function periods(
 
 Periods are returned oldest-first.
 
-- **Only whole periods.** A period is emitted only if its entire `[start, end)` falls
-  within the requested range. No pro-rated targets, so a partial ISO week at a window edge
-  never produces an unreachable target.
-- **Clamped to habit creation.** `from` is raised to the start of the period containing
-  `createdAt`. A habit created yesterday has no periods for the preceding month, so it
-  cannot report a 3% rate — and a *break* habit cannot accumulate phantom successful
-  periods from before it existed.
-- **Weeks are keyed by their Monday**, as a local-midnight date, never by a week number.
-  `getFullYear()` disagrees with the ISO week-year across Dec 29 – Jan 3, so week-number
-  keying would split a single week into two half-periods each carrying the full target.
-- **Non-required days produce no period.** On a `days` schedule, a Tuesday for a
-  Mon/Wed/Fri habit yields nothing, which is what makes it neutral everywhere downstream.
-- `actual` counts **distinct local days** with at least one log, not raw rows.
+**`to` is the exclusive end of the range of interest, and callers always pass tomorrow's
+local midnight.** This is load-bearing: it is what makes today's daily period whole, and
+what makes "the current period" well defined for every consumer. `closed` is computed
+against `now`, not against `to`, so today's period is emitted with `closed: false`.
+
+**Emission rule.** Incomplete periods are dropped at the `from` edge only:
+
+- A period whose `start < from` is **not** emitted — this is what prevents a pro-rated or
+  unreachable target at the far edge of a window.
+- The period containing `to - 1ms` — the current period — is **always** emitted, at full
+  target, even though its `end` may lie beyond `to`. Without this, a `perWeek` habit's
+  current ISO week (which ends next Monday) would never appear, and §2.4's open-period
+  rule, §4.5's summary cards and §5.4's `2/3` fraction would all have no period to read.
+
+**Clamped to habit creation**, so a habit cannot be judged for time it did not exist:
+
+- `daily` and `days` — the period containing `createdAt` is included. A habit created at
+  15:00 can still be logged that evening.
+- `perWeek` — periods start at the **first Monday at or after `createdAt`**. A habit created
+  on a Friday would otherwise face a full target of N for a week it existed two days of,
+  which is an unreachable target by another name and would anchor `bestStreak` at 0.
+
+**Weeks are keyed by their Monday**, as a local-midnight date, never by a week number.
+`getFullYear()` disagrees with the ISO week-year across Dec 29 – Jan 3, so week-number
+keying would split one week into two half-periods each carrying the full target.
+
+**Non-required days produce no period.** On a `days` schedule a Tuesday for a Mon/Wed/Fri
+habit yields nothing, which is what makes it neutral everywhere downstream.
+
+`actual` counts **distinct local days** with at least one log, not raw rows.
 
 ### 2.3 Period score
 
@@ -203,6 +225,11 @@ A period **meets target** when `build: actual >= target` / `break: actual <= tar
 
 Every statistic reads the period list and never inspects `schedule` again.
 
+**Empty period list.** A habit created today, or one whose window contains no period, yields
+an empty list. `currentStreak`, `bestStreak`, `rate30d` and `strength` all return **0** in
+that case — stated explicitly because `mean()` over an empty set is `NaN`, and §12 promises
+a `0%` display.
+
 - **`currentStreak`** — walk backwards from the most recent period, counting consecutive
   periods that met target. Phrased on *the most recent period*, not on "today", because a
   specific-days habit has no period at all on a non-required day:
@@ -217,10 +244,11 @@ Every statistic reads the period list and never inspects `schedule` again.
       streak before it was earned and then decrement it if the user logged later that day.
   - Every earlier period is closed and breaks the run if it did not meet target.
 
-- **`bestStreak`** — longest run of target-meeting periods **within the fetched window**.
-  Because this is window-bounded, the window differs by context (§3.3): the list view uses
-  365 days, and the flyout fetches that habit's complete log history so its "Best" figure
-  is genuinely all-time.
+- **`bestStreak`** — longest run of target-meeting periods within the fetched window.
+  **Computed only in the flyout**, over that habit's complete log history (§3.3), so the
+  figure is genuinely all-time. The list does not compute it: §4.5 dropped the best-streak
+  card and §5.4's slot shows only the current streak, so a window-bounded value would have
+  no consumer.
 
 - **`rate30d`** — `mean(periodScore)` over **closed** periods ending within the last 30
   days, as a percentage. The open current period is excluded so a mid-week reading is not
@@ -230,46 +258,75 @@ Every statistic reads the period list and never inspects `schedule` again.
   - 3×/week → the 4 complete ISO weeks ending last Sunday
 
 - **`strength`** — EWMA with `alpha = 2/31`, matching the existing model's span, over
-  **periods** rather than raw days, each contributing its `periodScore`. Output is
-  identical to the current model for daily build habits; a perfect 3-of-3 week now scores
-  1.0 rather than being penalised for four rest days.
+  **periods** rather than raw days, each contributing its `periodScore`. Output is identical
+  to the current model for daily build habits; a perfect 3-of-3 week now scores 1.0 rather
+  than being penalised for four rest days.
 
 - **`unit`** — `'day'` for daily and specific-days, `'week'` for per-week, so the UI renders
   `12d` vs `3w` without re-deriving it.
 
-### 2.5 Two separate helpers for "does this day count"
+**Window truncation.** `currentStreak` is bounded by the fetched window (§3.3: 365 days for
+the list). A streak longer than the window reads as the window length. This is the same
+class of limitation as the SQL view's 90-day cap, at four times the span; accepted rather
+than solved, because an unbounded per-habit query for every row on the list is not worth the
+correctness at these numbers.
 
-These answer different questions and must not be conflated.
+### 2.5 Three separate predicates
+
+These answer different questions and must not be conflated. Rev 1 of this spec overloaded
+one function across all three and produced contradictions in both directions.
 
 ```ts
-// For the Today page filter only. Takes raw jsonb because today_agenda
-// supplies item_details.schedule, not a Habit row.
+// (a) Today page filter only. Takes raw jsonb because today_agenda
+//     supplies item_details.schedule, not a Habit row.
 function isRequiredOn(rawSchedule: unknown, date: Date): boolean
 ```
 True every day for `daily` and `perWeek`; true only for listed weekdays on `days`.
 
 ```ts
-// For the row dots and the heatmap.
+// (b) Can this heatmap cell be clicked to backfill?
+function canBackfill(schedule: NormalizedSchedule, date: Date, today: Date): boolean
+```
+False for a future date. False for a `days` schedule on an unlisted weekday, because a log
+there would be invisible to every statistic (§2.2 emits no period for it) while rendering as
+done. **True for any past-or-today date on `daily` and `perWeek`** — including every unlogged
+day of a per-week habit, which is exactly the case rev 1 made unreachable.
+
+```ts
+// (c) How is this dot or heatmap cell painted?
 function dotState(
   schedule: NormalizedSchedule,
   polarity: 'build' | 'break',
   date: Date, today: Date, logged: boolean,
-): 'done' | 'broke' | 'missed' | 'pending' | 'not-required' | 'future'
+): DotState
 ```
 
-| Result | Condition |
-|---|---|
-| `future` | `date > today` |
-| `done` | logged, build polarity |
-| `broke` | logged, break polarity |
-| `not-required` | `days` schedule and `date` not listed; **or** `perWeek` and not logged |
-| `pending` | required, `date === today`, not logged |
-| `missed` | required, `date < today`, not logged |
+Evaluated as ordered rules, first match wins:
 
-`pending` exists so today's unlogged dot is not painted as a miss before the day ends,
-matching the streak rule. A `perWeek` habit therefore never renders a `missed` dot — no
-individual day is ever required — and the week's standing is carried by the `2/3` fraction
-in the streak slot (§5.4) and by the streak resetting when an unmet week closes.
+| # | Condition | Result |
+|---|---|---|
+| 1 | `date > today` | `future` |
+| 2 | `logged` | `done` (build) / `broke` (break) |
+| 3 | `schedule.kind === 'perWeek'` | `idle` |
+| 4 | weekday not listed on a `days` schedule | `not-required` |
+| 5 | `date === today` | `pending` |
+| 6 | otherwise | `missed` (build) / `clean` (break) |
+
+Rule 6 is what rev 1 lacked. Without a break branch there, a daily break habit that
+successfully abstained for thirty days fell through to `missed` and painted thirty red
+dots — inverting the entire polarity model. `clean` is a **success** state: a break habit's
+row reads mostly green with red marks where it was broken.
+
+`pending` (rule 5) exists so today's unlogged dot is not painted as a miss before the day
+ends, matching the streak rule. `idle` (rule 3) is why a `perWeek` habit never renders a
+`missed` dot — no individual day is ever required — with the week's standing carried by the
+`2/3` fraction in the streak slot (§5.4) and by the streak resetting when an unmet week
+closes.
+
+**Known display quirk:** rule 2 precedes rule 4, so a log written on a non-required day by
+the MCP server or an agent renders `done` even though §2.2 emits no period for it. The UI
+cannot create such a log (`canBackfill` forbids it), but it can arrive from outside and will
+look like it counted when it did not.
 
 ### 2.6 Timezone
 
@@ -278,16 +335,16 @@ All period boundaries are computed in **local time**, and the module buckets a l
 regardless of who wrote the row.
 
 Noon anchoring on write (§3.1) serves a narrower purpose: `habit_stats` and `today_agenda`
-both bucket by `(logged_at at time zone 'UTC')::date`, so anchoring at 12:00 local keeps
-the SQL views agreeing with this module. Lisbon is UTC+0 in winter and UTC+1 in summer;
-noon anchoring is safe for both.
+both bucket by `(logged_at at time zone 'UTC')::date`, so anchoring at 12:00 local keeps the
+SQL views agreeing with this module. Lisbon is UTC+0 in winter and UTC+1 in summer; noon
+anchoring is safe for both.
 
 ### 2.7 Types
 
 `src/lib/types.ts` is a single line — `export type Database = any` — so there are no
 generated row types to import. `habit-stats.ts` defines its own minimal local input types
-(the `Period` shape above, plus `{ loggedAt: Date }` for logs). That is what makes the
-module pure and testable rather than coupled to Supabase.
+(the `Period` and `NormalizedSchedule` shapes above, plus `{ loggedAt: Date }` for logs).
+That is what makes the module pure and testable rather than coupled to Supabase.
 
 ## 3. Services and hooks
 
@@ -309,9 +366,9 @@ Currently broken: both existing functions target a non-existent `logged_date` co
 | `unlogHabit(id, date?)` | Deletes with `gte(dayStart)` + `lt(dayStart + 1 day)` — **not** `.eq()`, which can never match a timestamp |
 
 `unlogHabit` **hard-deletes**, unlike `archiveHabit` one row above. This is deliberate:
-unlogging means the log never happened, so there is no history worth preserving, and both
-existing views filter `archived_at is null` anyway, which would make a soft-deleted log
-invisible but still present.
+unlogging is a *correction*, not an event. The user is saying the log should never have
+existed, so there is no history worth preserving and nothing a later audit would want to
+recover. Archiving instead would leave a permanent row for every mis-tap.
 
 ### 3.2 `src/hooks/use-habits.ts`
 
@@ -322,10 +379,16 @@ invisible but still present.
 The existing hooks have only `onSuccess`, which cannot deliver the optimistic behaviour
 §5.2 promises. `useLogHabit` / `useUnlogHabit` need the full contract:
 
-- `onMutate` — `cancelQueries` on `["habit-logs"]`, snapshot the cached logs, write the
-  optimistic log in or out
-- `onError` — restore the snapshot and raise a `Toast`
+- `onMutate` — `cancelQueries` on `["habit-logs"]`, snapshot **both** cached shapes, write
+  the optimistic log into or out of each
+- `onError` — restore both snapshots and raise a `Toast`
 - `onSettled` — `invalidateQueries` on `["habits"]`, `["habit-logs"]` and `["today"]`
+
+**Two caches, not one.** §3.3 splits the logs into `["habit-logs", fromISO, toISO]` (all
+habits, one flat array) and `["habit-logs", habitId]` (a single habit). A prefix
+`cancelQueries(["habit-logs"])` matches both, but the optimistic write and the snapshot
+restore must handle both shapes explicitly — otherwise toggling the circle while the flyout
+is open leaves the heatmap and stats bar stale until the next refetch.
 
 Other mutations invalidate the same three keys on success. The Today page reads the same
 logs through `today_agenda`, which is why `["today"]` is included.
@@ -337,11 +400,17 @@ are separate queries with separate keys:
 
 | Window | Key | Range | Feeds |
 |---|---|---|---|
-| Stats | `["habit-logs", from, to]` | today-anchored, 365 days, fixed | Summary strip, row dots, row streaks |
-| Flyout | `["habit-logs", habitId]` | unbounded, single habit | Flyout stats bar, heatmap at any month |
+| Stats | `["habit-logs", fromISO, toISO]` | today-anchored, 365 days, fixed | Summary strip, row dots, row `currentStreak` |
+| Flyout | `["habit-logs", habitId]` | unbounded, single habit | Flyout stats bar incl. all-time `bestStreak`, heatmap at any month |
 
-Paging the heatmap back to March changes nothing about the list's numbers, because the
-list never reads the flyout's query.
+Paging the heatmap back to March changes nothing about the list's numbers, because the list
+never reads the flyout's query.
+
+Key members are **ISO date strings**, not `Date` objects — a `Date` in a query key is a new
+object identity on every render and would churn the cache continuously.
+
+Both queries pass `to` = tomorrow's local midnight to `periods()` (§2.2), regardless of
+their own fetch range.
 
 ### 3.4 Why not the `habit_stats` view
 
@@ -358,9 +427,15 @@ Confirmed by reading `002_views.sql`. The view is wrong in four ways:
 4. The view carries a dead `streaks` CTE (lines 153–187) the final `select` never
    references, plus two correlated subqueries per habit.
 
-The page already fetches raw logs for the week dots and heatmap, so computing statistics in
-TypeScript costs nothing extra and yields a pure, unit-testable module. The view is left in
-the database untouched; the MCP server may still read it.
+The page must fetch raw logs regardless — the week dots and heatmap render individual days,
+which no aggregate view can supply — so the only question is how far back. The list query
+pulls 365 days across all habits to give `currentStreak` room (§2.4's window-truncation
+note); for 5–15 habits that is at most a few thousand rows in a single indexed query on
+`idx_habit_logs_logged_at`, and realistically far fewer since most habits are not logged
+every day. That is the honest cost: not free, but cheap, and it buys a pure, unit-testable
+module in place of SQL that cannot be tested at all.
+
+The view is left in the database untouched; the MCP server may still read it.
 
 ## 4. Page structure and components
 
@@ -429,10 +504,22 @@ Four cards. All four are **unit-free**, because §2.4 makes streaks unit-depende
 
 | Card | Value |
 |---|---|
-| Done today | `n / m` — habits whose current period is met, over habits with a period today |
-| At risk | count of habits whose streak ≥ 3 and whose current period is open and unmet |
-| 30-day rate | mean `rate30d` across visible habits |
-| Strength | mean `strength` across visible habits |
+| Done today | `n / m` — **build habits only**. `m` = build habits whose current period is open; `n` = those whose current period already meets target |
+| At risk | **build habits only**: count with `currentStreak >= 3` whose current period is open and unmet |
+| 30-day rate | mean `rate30d` across all visible habits, both polarities |
+| Strength | mean `strength` across all visible habits, both polarities |
+
+**The first two cards count build habits only**, and this is not an oversight. §2.3 defines
+a break habit's period as met when `actual <= target`, which is trivially true at 00:00 —
+the same premature-credit trap §2.4 refuses for `currentStreak`. Counting break habits as
+"done today" at midnight would reintroduce exactly that bug in the summary strip. "Done"
+and "at risk" have no mid-period meaning for a habit whose success is defined by absence, so
+break habits are excluded from both and appear only in the two rate-based cards, which read
+closed periods and are therefore safe.
+
+`m` counts habits whose **current period is open** rather than "habits with a period today",
+which is meaningless when the period is a week. A per-week habit at 2/3 counts toward `m`
+and not toward `n`, whether or not it was logged today.
 
 ## 5. Row interactions
 
@@ -457,18 +544,29 @@ Left to right: circle toggle, name with a schedule/area subtitle, seven week dot
 
 ### 5.3 Week dot states
 
-Rendered from `dotState` (§2.5):
+Rendered from `dotState` (§2.5). Seven states, five visual treatments:
 
-| State | Render |
-|---|---|
-| `done` | filled, success |
-| `broke` | filled, danger |
-| `missed` | filled, danger |
-| `pending` | hollow, muted, accent ring (it is today) |
-| `not-required` | small hollow dot, muted |
-| `future` | hollow, muted |
+| State | Polarity | Render |
+|---|---|---|
+| `done` | build, logged | filled, success |
+| `clean` | break, abstained | filled, success |
+| `missed` | build, required day unlogged | filled, danger |
+| `broke` | break, logged | filled, danger |
+| `pending` | either, today, unlogged | hollow, muted |
+| `idle` | per-week, unlogged | small hollow dot, muted |
+| `not-required` | off-day on a `days` schedule | small hollow dot, muted |
+| `future` | either | hollow, muted |
 
 Today always carries an accent ring drawn *over* whichever state applies.
+
+`done` and `clean` share a treatment, as do `missed` and `broke`, because from the user's
+side the question is only ever "was this a good day or a bad one" — the polarity is already
+carried by the row's pill and by what the circle does. They stay distinct in `dotState` so
+the logic is unambiguous and independently testable.
+
+A break habit therefore reads as a mostly-green row with red marks where it was broken,
+which is the correct inversion. Rev 1 of this spec had no `clean` state and painted those
+green days red.
 
 ### 5.4 Streak slot
 
@@ -494,15 +592,20 @@ the metadata block is passed through the new `children` prop.
 | Strength | EWMA bar, warning→success gradient, "100% = Automatic" | Read-only |
 | Linked goal | Goal name, area and horizon, click through to Goals | Link / unlink |
 
-Heatmap cells use the same `dotState` values as the week dots, so an off-day on a
-Mon/Wed/Fri habit reads as neutral rather than as a hole in the month. Today gets an accent
-outline over whichever state applies.
+Heatmap cells are **painted** by `dotState` and **enabled** by `canBackfill` (§2.5) — two
+separate predicates, because "how does this look" and "can this be clicked" are different
+questions. Rev 1 used `dotState` for both and made per-week habits impossible to backfill,
+since every unlogged day of a per-week habit is `idle`.
 
-Clicking a `future` or `not-required` cell does nothing. Non-required cells are explicitly
-inert because a log written there would be invisible to every statistic (§2.2 emits no
-period for it) yet would render as `done` — a cell that lies about its own effect. Clicking
-a past required cell calls `logHabit` / `unlogHabit` with that date, which is why both take
-an optional date.
+- An off-day on a Mon/Wed/Fri habit reads as neutral rather than as a hole in the month, and
+  is **inert**: a log written there would be invisible to every statistic (§2.2 emits no
+  period for it) yet would render as `done` — a cell that lies about its own effect.
+- Every past-or-today cell of a `daily` or `perWeek` habit is **clickable**, including the
+  `idle` ones, calling `logHabit` / `unlogHabit` with that date. This is why both functions
+  take an optional date.
+- Future cells are always inert.
+
+Today gets an accent outline over whichever state applies.
 
 ### 6.1 `SchedulePicker`
 
@@ -609,8 +712,10 @@ Suppressing it would require the Today page to fetch the current week's logs, wh
 ### 9.1 Infrastructure
 
 **The project has no test runner.** `package.json` scripts are `dev`/`build`/`start`/`lint`,
-devDependencies contain no vitest or jest, and there are zero test files under `src/`. The
-`mcp/` package has its own vitest setup, but the web app does not.
+devDependencies contain no vitest or jest, and there are zero test files under `src/`. On
+this branch `mcp/` contains only untracked `dist/` and `node_modules/` left over from
+`feat/mcp-server`; the MCP package's own vitest setup lives on that branch and is not
+available here to copy from.
 
 This work adds **vitest only** — no jsdom, no React Testing Library — plus a `test` script.
 `habit-stats.ts` is deliberately pure and dependency-free (§2.7), so it needs no DOM
@@ -620,13 +725,23 @@ environment.
 
 `habit-stats.ts` carries all of the interesting logic and takes the coverage:
 
-- **Normalisation** — `count: 9`, `count: 0`, `days: []`, all seven days, `days: [0]`
-  (JavaScript convention), null, `{}`, and unrecognised `type` all fall back correctly
+- **Normalisation** — `count: 9`, `count: 0`, `count: 1`, `count: 3.5`, `count: NaN`,
+  `count: Infinity`, `days: []`, all seven days, `days: [0]` (JavaScript convention), null,
+  `{}`, and unrecognised `type` all fall back to daily. `NaN` and `3.5` are called out
+  because a two-sided bounds check would let both through.
+- **Empty period list** — a habit created today returns 0 for all four statistics, never
+  `NaN`
 - **Period generation** for all three shapes, including a specific-days habit producing no
   period on a non-required day
-- **Whole periods only** — a window edge cutting through an ISO week emits no partial period
+- **`from`-edge trimming** — a window edge cutting through an ISO week emits no partial
+  period at the far edge
+- **The current period is always emitted** — a `perWeek` habit mid-week has an open period
+  with `closed: false` at full target, so `currentStreak`, the `2/3` fraction and the
+  summary cards all have something to read. This is the rev-2 regression that made the open
+  week vanish.
 - **Creation clamping** — a habit created yesterday reports no periods for last month, for
-  both polarities
+  both polarities; a `perWeek` habit created on a Friday starts at the following Monday, not
+  mid-week at full target
 - **Week keying across a year boundary** — 2026-12-28 … 2027-01-03 is one period
 - **Streak survives an open period** — a daily build habit logged through yesterday but not
   today reports the full streak, not 0. This is the headline bug in the SQL view.
@@ -642,8 +757,13 @@ environment.
   by a zero target in either `rate30d` or `strength`
 - **Duplicate logs on one day** count once
 - **Timezone** — a log at 00:30 local buckets to the correct local day
-- **`dotState`** — all six results, including `pending` for today and `not-required` for a
-  per-week unlogged day
+- **`dotState`** — all seven results across both polarities. Specifically: a daily **break**
+  habit's past unlogged day is `clean`, not `missed` (the rev-2 bug that painted successful
+  abstention red); `idle` for a per-week unlogged day; `pending` for today; `not-required`
+  for an off-day
+- **`canBackfill`** — true for a per-week habit's unlogged past day (the rev-2 bug that made
+  per-week backfill impossible), false for an off-day on a `days` schedule, false for any
+  future date
 
 Component behaviour (optimistic update and rollback, dot rendering) is **not** covered by
 automated tests in this work; adding jsdom and RTL is a separate decision. It is verified
@@ -656,14 +776,25 @@ Run after implementation, before merge:
 1. Log and unlog today on a daily habit; confirm the circle, last dot and streak all update
    and survive a refresh
 2. Kill the network and tap the circle; confirm rollback and the error `Toast`
-3. Backfill a past day from the heatmap; confirm the streak recomputes
-4. Click a non-required heatmap cell on a Mon/Wed/Fri habit; confirm nothing happens
-5. Switch a habit to 3×/week; confirm dots stop showing red, the slot shows `n/3`, and the
+3. Open the flyout, then toggle the circle behind it; confirm the heatmap and stats bar
+   update too, not just the row (§3.2's two caches)
+4. Backfill a past day from the heatmap; confirm the streak recomputes
+5. Click a non-required heatmap cell on a Mon/Wed/Fri habit; confirm nothing happens
+6. Backfill a past day on a **3×/week** habit; confirm the cell is clickable and the
+   fraction updates
+7. Switch a habit to 3×/week; confirm dots stop showing red, the slot shows `n/3`, and the
    streak reads in weeks
-6. Set a habit inactive; confirm it disappears from Active and returns under All
-7. Link a habit to a KR from Goals; confirm the KR shows a rate and no check circle
-8. Mark that KR done; confirm the habit is unaffected
-9. Confirm a Mon/Wed/Fri habit is absent from Today on a Tuesday
+8. **Create a break habit and leave it unlogged for several days; confirm those days render
+   green, not red, and the streak grows only as each day closes**
+9. Log the break habit once; confirm that day turns red and the streak resets
+10. Set a habit inactive; confirm it disappears from Active and returns under All
+11. Link a habit to a KR from Goals; confirm the KR shows a rate and no check circle
+12. Mark that KR done; confirm the habit is unaffected
+13. Confirm a Mon/Wed/Fri habit is absent from Today on a Tuesday
+14. With no habits, confirm the empty state renders and QuickAdd is focused
+15. Break the Supabase URL; confirm the error row and retry action appear rather than a
+    blank page
+16. Fail a `SchedulePicker` save; confirm the popover stays open with the previous value
 
 ## 11. Decisions taken
 
@@ -676,10 +807,14 @@ Run after implementation, before merge:
 | Link direction | `src_type='key_result'`, `dst_type='habit'` — the existing convention |
 | Trigger changes | None. Habits are already excluded by construction (§7.2) |
 | `rate30d` window | Closed periods only; the open current period is excluded |
-| `bestStreak` scope | Window-bounded: 365 days in the list, all-time in the flyout |
+| `bestStreak` scope | Flyout only, over the habit's full history. Not computed for the list |
 | Break-habit open period | Always skipped, never credited |
+| `to` argument | Always tomorrow's local midnight, from every caller |
+| Period emission | Trim incomplete periods at the `from` edge only; always emit the current period |
+| Paint vs click | `dotState` paints, `canBackfill` enables — separate predicates |
 | Test scope | Vitest for the pure module; no jsdom/RTL, no component tests |
-| Summary strip | Unit-free metrics only; "best streak" replaced by "at risk" |
+| Summary strip | Unit-free metrics only; "best streak" replaced by "at risk"; "done today" and "at risk" count build habits only |
+| `count: 1` | Normalised to daily rather than supported as a distinct shape |
 
 ## 12. Error and empty states
 
@@ -692,7 +827,7 @@ Run after implementation, before merge:
 | Heatmap backfill failure | Cell reverts + `Toast` |
 | `SchedulePicker` save failure | Popover stays open, previous value restored, `Toast` |
 | Link / unlink failure | `Toast`; KR list refetches |
-| Habit with no logs at all | Streak `0`, rate `0%`, strength `0%`, empty heatmap — not `—` |
+| Habit with no logs at all | Streak `0`, rate `0%`, strength `0%`, empty heatmap — not `—`. §2.4's empty-list rule is what produces this rather than `NaN` |
 
 ## 13. Risks
 
@@ -704,5 +839,10 @@ Run after implementation, before merge:
   view is not read, so drift would be invisible in production. The §9.2 test is the only
   guard.
 - **`normalizeSchedule` silently downgrades bad data to daily.** A habit whose schedule was
-  written incorrectly by an agent will look like it is working rather than raising an
-  error. This is the right default for a personal app but means bad writes go unnoticed.
+  written incorrectly by an agent will look like it is working rather than raising an error.
+  This is the right default for a personal app but means bad writes go unnoticed.
+- **`currentStreak` is truncated at the 365-day window** (§2.4). A streak longer than a year
+  reads as 365. Accepted, but it is the same class of flaw this spec criticises the SQL view
+  for having at 90 days.
+- **A log written outside the UI on a non-required day renders as `done`** (§2.5) while
+  contributing to no statistic. Only reachable via the MCP server or an agent.
