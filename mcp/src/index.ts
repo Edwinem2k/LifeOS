@@ -3,25 +3,15 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import './supabase.js'; // Triggers startup validation
 
 import { registerTaskTools } from './tools/tasks.js';
-
 import { registerProjectTools } from './tools/projects.js';
-
 import { registerGoalTools } from './tools/goals.js';
-
 import { registerHabitTools } from './tools/habits.js';
-
 import { registerNoteTools } from './tools/notes.js';
-
 import { registerContactTools } from './tools/contacts.js';
-
 import { registerInteractionTools } from './tools/interactions.js';
-
 import { registerListTools } from './tools/lists.js';
-
 import { registerActivityTools } from './tools/activities.js';
-
 import { registerLinkTools } from './tools/links.js';
-
 import { registerViewTools } from './tools/views.js';
 
 const server = new McpServer({
