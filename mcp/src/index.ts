@@ -10,6 +10,8 @@ import { registerGoalTools } from './tools/goals.js';
 
 import { registerHabitTools } from './tools/habits.js';
 
+import { registerNoteTools } from './tools/notes.js';
+
 const server = new McpServer({
   name: 'lifeos',
   version: '0.1.0',
@@ -20,6 +22,7 @@ registerTaskTools(server);
 registerProjectTools(server);
 registerGoalTools(server);
 registerHabitTools(server);
+registerNoteTools(server);
 
 async function main() {
   const transport = new StdioServerTransport();
