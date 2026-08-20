@@ -1,4 +1,4 @@
--- 006_fix_links_updated_at.sql
+-- 007_fix_links_updated_at.sql
 -- Fixes a latent runtime error on the links table.
 --
 -- Migration 001 creates trg_links_updated_at: its DO block loops over a list of
@@ -39,4 +39,4 @@ create trigger trg_links_updated_at
   for each row execute function set_updated_at();
 
 comment on column links.updated_at is
-  'Trigger-maintained by set_updated_at(). Added in 006 — 001 attached the trigger without the column.';
+  'Trigger-maintained by set_updated_at(). Added in 007 — 001 attached the trigger without the column.';
