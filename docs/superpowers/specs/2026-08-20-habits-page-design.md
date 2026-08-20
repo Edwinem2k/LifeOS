@@ -1,7 +1,7 @@
 # Habits Page — Design Spec
 
 **Date:** 2026-08-20
-**Status:** Draft (rev 3 — after second spec review)
+**Status:** Draft (rev 4 — after third spec review)
 **Mockup:** `mockups/habits-full.html`
 **Design review:** https://claude.ai/code/artifact/163f159d-b812-4f9e-8758-7eb95fe9449c
 **Branch:** `feat/habits-page` (off `main`)
@@ -179,22 +179,43 @@ local midnight.** This is load-bearing: it is what makes today's daily period wh
 what makes "the current period" well defined for every consumer. `closed` is computed
 against `now`, not against `to`, so today's period is emitted with `closed: false`.
 
-**Emission rule.** Incomplete periods are dropped at the `from` edge only:
+Two separate concerns govern which periods exist and what they demand. Keeping them
+separate matters: an earlier revision expressed both as adjustments to `from` and they
+collided on a habit created mid-week.
 
-- A period whose `start < from` is **not** emitted — this is what prevents a pro-rated or
-  unreachable target at the far edge of a window.
-- The period containing `to - 1ms` — the current period — is **always** emitted, at full
-  target, even though its `end` may lie beyond `to`. Without this, a `perWeek` habit's
-  current ISO week (which ends next Monday) would never appear, and §2.4's open-period
-  rule, §4.5's summary cards and §5.4's `2/3` fraction would all have no period to read.
+**(a) Window trimming — controls which periods are emitted.**
 
-**Clamped to habit creation**, so a habit cannot be judged for time it did not exist:
+- A period whose `start < from` is **not** emitted. `from` here is the *fetch window's*
+  start (§3.3), an arbitrary boundary, so a period straddling it would carry a target for
+  time the window cannot see.
+- No period earlier than the one containing `createdAt` is emitted, whatever `from` says.
+- The period containing `to - 1ms` — the current period — is **always** emitted where such
+  a period exists, even though its `end` may lie beyond `to`. Without this, a `perWeek`
+  habit's current ISO week (which ends next Monday) would never appear, and §2.4's
+  open-period rule, §4.5's summary cards and §5.4's `2/3` fraction would have nothing to
+  read. On a `days` schedule a non-required day yields no period, so there is nothing to
+  emit and nothing is synthesised.
 
-- `daily` and `days` — the period containing `createdAt` is included. A habit created at
-  15:00 can still be logged that evening.
-- `perWeek` — periods start at the **first Monday at or after `createdAt`**. A habit created
-  on a Friday would otherwise face a full target of N for a week it existed two days of,
-  which is an unreachable target by another name and would anchor `bestStreak` at 0.
+**(b) Creation pro-rating — controls the target of the period a habit was created in.**
+
+The period containing `createdAt` is always emitted, but its target reflects only the days
+the habit actually existed for:
+
+- `daily` and `days` — target stays **1**. A habit created at 15:00 can still be logged
+  that evening, so nothing is unreachable.
+- `perWeek` — target becomes `min(count, daysRemainingInWeekFromCreation)`. A 3×/week habit
+  created on Wednesday keeps target 3 (five days remain, so three sessions are reachable);
+  created on Saturday it takes target 2, because two days cannot hold three sessions.
+
+This is the *only* place a target is pro-rated, and the distinction from the banned
+far-edge pro-rating is principled rather than convenient: the window's `from` is an
+arbitrary rendering choice, while `createdAt` is a fact about the habit. Judging a habit
+against days before it existed is what §3.4 criticises the SQL view for.
+
+The alternative — starting per-week periods at the first Monday after `createdAt` — was
+rejected because it leaves a habit with **no current period at all** for its first two to
+six days, so the row the user just created shows no fraction, contributes nothing to the
+summary strip, and has nothing for the streak rule to skip.
 
 **Weeks are keyed by their Monday**, as a local-midnight date, never by a week number.
 `getFullYear()` disagrees with the ISO week-year across Dec 29 – Jan 3, so week-number
@@ -502,24 +523,38 @@ src/
 Four cards. All four are **unit-free**, because §2.4 makes streaks unit-dependent and a
 "best streak" comparing a daily `12d` against a weekly `3w` has no defined meaning.
 
-| Card | Value |
-|---|---|
-| Done today | `n / m` — **build habits only**. `m` = build habits whose current period is open; `n` = those whose current period already meets target |
-| At risk | **build habits only**: count with `currentStreak >= 3` whose current period is open and unmet |
-| 30-day rate | mean `rate30d` across all visible habits, both polarities |
-| Strength | mean `strength` across all visible habits, both polarities |
+| Card | Caption | Value |
+|---|---|---|
+| On track | build habits | `n / m` — `m` = build habits whose current period is open; `n` = those whose current period already meets target |
+| At risk | build habits | count with `currentStreak >= 3` whose current period is open and unmet |
+| 30-day rate | all habits | mean `rate30d` across visible habits, both polarities |
+| Strength | all habits | mean `strength` across visible habits, both polarities |
 
-**The first two cards count build habits only**, and this is not an oversight. §2.3 defines
-a break habit's period as met when `actual <= target`, which is trivially true at 00:00 —
-the same premature-credit trap §2.4 refuses for `currentStreak`. Counting break habits as
-"done today" at midnight would reintroduce exactly that bug in the summary strip. "Done"
-and "at risk" have no mid-period meaning for a habit whose success is defined by absence, so
-break habits are excluded from both and appear only in the two rate-based cards, which read
-closed periods and are therefore safe.
+**"On track", not "Done today".** The card counts habits whose current period is met, and
+for a per-week habit that period is a week — so a 3×/week habit that finished on Monday is
+still counted on Friday. Labelling that "done today" would be a plain lie four days out of
+seven. "On track" is true for both units: the daily habit is on track because it was logged
+today, the weekly one because its week is already met.
+
+**The first two cards count build habits only**, and the caption says so rather than leaving
+the user to infer it from a total that silently excludes half their habits. The reason is
+mechanical, not philosophical:
+
+- *On track* — §2.3 defines a break habit's period as met when `actual <= target`, trivially
+  true at 00:00. Counting break habits here would credit every one of them at midnight,
+  reintroducing exactly the premature-credit bug §2.4 refuses for `currentStreak`.
+- *At risk* — for break polarity, "open and unmet" can only become true once the user has
+  already logged, at which point the streak is **broken**, not at risk. The condition can
+  never fire usefully, so the card would always read 0.
+
+Break habits are represented in the two rate cards, which read closed periods and are
+therefore safe for either polarity.
 
 `m` counts habits whose **current period is open** rather than "habits with a period today",
-which is meaningless when the period is a week. A per-week habit at 2/3 counts toward `m`
-and not toward `n`, whether or not it was logged today.
+which is meaningless when the period is a week.
+
+**Degenerate case.** With no build habits visible, the first two cards render `—` with the
+caption "no build habits" rather than a misleading `0 / 0` and `0`.
 
 ## 5. Row interactions
 
@@ -544,7 +579,7 @@ Left to right: circle toggle, name with a schedule/area subtitle, seven week dot
 
 ### 5.3 Week dot states
 
-Rendered from `dotState` (§2.5). Seven states, five visual treatments:
+Rendered from `dotState` (§2.5). Eight states, four visual treatments:
 
 | State | Polarity | Render |
 |---|---|---|
@@ -588,7 +623,7 @@ the metadata block is passed through the new `children` prop.
 |---|---|---|
 | Metadata | Row 1: polarity, metric, area. Row 2: schedule, active | `EditableCell`, except schedule → `SchedulePicker` and active → §6.2 |
 | Stats bar | Current streak, best streak (all-time), 30-day rate, strength | Read-only, from `habit-stats.ts` |
-| Heatmap | One month, Mon-first, `←` `→` month paging | Click a past **required** cell to backfill or clear |
+| Heatmap | One month, Mon-first, `←` `→` month paging | Click any cell where `canBackfill` is true to log or clear that date |
 | Strength | EWMA bar, warning→success gradient, "100% = Automatic" | Read-only |
 | Linked goal | Goal name, area and horizon, click through to Goals | Link / unlink |
 
@@ -613,7 +648,11 @@ Follows the existing `NotePopover` pattern: click the value, a popover opens, cl
 outside saves.
 
 - A select for the three shapes: *Every day* / *N times a week* / *Specific days*
-- *N times a week* reveals a 1–6 stepper. Choosing 7 switches to *Every day*.
+- *N times a week* reveals a **2–6** stepper, matching §2.1's valid range. Choosing 7
+  switches to *Every day*. 1 is not offered: §2.1 normalises `count: 1` to daily, so a
+  stepper that allowed it would silently flip the habit to "Every day" the moment the user
+  chose "1× per week". The helper text points at *Specific days* with one chip instead,
+  which is what a once-a-week habit actually is.
 - *Specific days* reveals seven day chips, ISO order Mon→Sun. Selecting all seven switches
   to *Every day*; selecting none is rejected.
 
@@ -736,12 +775,13 @@ environment.
 - **`from`-edge trimming** — a window edge cutting through an ISO week emits no partial
   period at the far edge
 - **The current period is always emitted** — a `perWeek` habit mid-week has an open period
-  with `closed: false` at full target, so `currentStreak`, the `2/3` fraction and the
-  summary cards all have something to read. This is the rev-2 regression that made the open
-  week vanish.
-- **Creation clamping** — a habit created yesterday reports no periods for last month, for
-  both polarities; a `perWeek` habit created on a Friday starts at the following Monday, not
-  mid-week at full target
+  with `closed: false`, so `currentStreak`, the `2/3` fraction and the summary cards all
+  have something to read. This is the rev-2 regression that made the open week vanish.
+- **Creation trimming** — a habit created yesterday reports no periods for last month, for
+  both polarities
+- **Creation pro-rating** — a 3×/week habit created on a Wednesday has a current period with
+  target 3 (five days remain); created on a Saturday, target 2. It always *has* a current
+  period, which is the rev-3 collision between trimming and always-emit
 - **Week keying across a year boundary** — 2026-12-28 … 2027-01-03 is one period
 - **Streak survives an open period** — a daily build habit logged through yesterday but not
   today reports the full streak, not 0. This is the headline bug in the SQL view.
@@ -757,7 +797,7 @@ environment.
   by a zero target in either `rate30d` or `strength`
 - **Duplicate logs on one day** count once
 - **Timezone** — a log at 00:30 local buckets to the correct local day
-- **`dotState`** — all seven results across both polarities. Specifically: a daily **break**
+- **`dotState`** — all eight results across both polarities. Specifically: a daily **break**
   habit's past unlogged day is `clean`, not `missed` (the rev-2 bug that painted successful
   abstention red); `idle` for a per-week unlogged day; `pending` for today; `not-required`
   for an off-day
@@ -810,7 +850,9 @@ Run after implementation, before merge:
 | `bestStreak` scope | Flyout only, over the habit's full history. Not computed for the list |
 | Break-habit open period | Always skipped, never credited |
 | `to` argument | Always tomorrow's local midnight, from every caller |
-| Period emission | Trim incomplete periods at the `from` edge only; always emit the current period |
+| Period emission | Window trimming decides *which* periods exist; creation pro-rating decides the *target* of the creation period. Kept separate so they cannot collide |
+| Creation week | Emitted with a pro-rated target, not skipped — the only pro-rating in the spec |
+| Summary label | "On track", not "Done today" — the latter is false for per-week habits |
 | Paint vs click | `dotState` paints, `canBackfill` enables — separate predicates |
 | Test scope | Vitest for the pure module; no jsdom/RTL, no component tests |
 | Summary strip | Unit-free metrics only; "best streak" replaced by "at risk"; "done today" and "at risk" count build habits only |
@@ -821,6 +863,7 @@ Run after implementation, before merge:
 | Situation | Behaviour |
 |---|---|
 | No habits yet | Empty state in the list area with a line of copy and the QuickAdd field focused |
+| Only break habits visible | "On track" and "At risk" render `—` with the caption "no build habits"; the rate cards still compute |
 | `getHabits` / `getHabitLogs` error | Inline error row with a retry action; summary strip renders `—` |
 | Loading | Skeleton rows matching `HabitRow` height; summary strip shows `—` |
 | Log / unlog failure | Optimistic rollback + `Toast` (§3.2) |
