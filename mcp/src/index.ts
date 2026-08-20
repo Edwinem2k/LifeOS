@@ -20,6 +20,8 @@ import { registerListTools } from './tools/lists.js';
 
 import { registerActivityTools } from './tools/activities.js';
 
+import { registerLinkTools } from './tools/links.js';
+
 const server = new McpServer({
   name: 'lifeos',
   version: '0.1.0',
@@ -35,6 +37,7 @@ registerContactTools(server);
 registerInteractionTools(server);
 registerListTools(server);
 registerActivityTools(server);
+registerLinkTools(server);
 
 async function main() {
   const transport = new StdioServerTransport();
