@@ -1483,6 +1483,8 @@ git commit -m "fix: repair logHabit/unlogHabit and add the habits service surfac
 
 **Files:**
 - Modify: `src/hooks/use-habits.ts` (full rewrite — the file is 24 lines)
+- Modify: `src/services/links.ts` (widen one select — Step 1a)
+- Modify: `src/hooks/use-links.ts` (one invalidation in two mutations — Step 1b)
 - Modify: `src/app/(app)/page.tsx` (one call site)
 
 - [ ] **Step 1: Rewrite the hooks file**
@@ -1693,7 +1695,8 @@ Expected: clean.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/hooks/use-habits.ts src/hooks/use-links.ts src/services/links.ts         "src/app/(app)/page.tsx"
+git add src/hooks/use-habits.ts src/hooks/use-links.ts \
+        src/services/links.ts "src/app/(app)/page.tsx"
 git commit -m "feat: add habits hooks with two-cache optimistic log/unlog"
 ```
 
@@ -1703,7 +1706,7 @@ git commit -m "feat: add habits hooks with two-cache optimistic log/unlog"
 
 `StatusPill`'s `type` union is `"status" | "area" | "priority"`, and `getPillColor` (`constants.ts:106-110`) falls through to `getStatusColor` for anything unrecognised, which returns `var(--color-text-muted)`. `'build'`, `'break'`, `'boolean'` and `'count'` appear in no map, so all four would render as identical grey pills.
 
-`FieldConfig.pillType` in **both** `EditableCell.tsx:15` and `FlyoutPanel.tsx:15` declares the same narrow union, so all three must widen together or the flyout needs an `as any` cast.
+The same narrow union is declared in **four** places — `StatusPill.tsx`, `EditableCell.tsx:15`, `FlyoutPanel.tsx:15` (both as `FieldConfig.pillType`) and `FilterBar.tsx:44`. They must widen together, or the flyout needs an `as any` cast.
 
 **Files:**
 - Modify: `src/lib/constants.ts`
@@ -2988,9 +2991,15 @@ circle, because a habit is never done."
 ```bash
 npm test          # habit-stats suite green
 npx tsc --noEmit  # clean
-npm run lint      # clean
+npm run lint      # exits 0; see the note below
 npm run build     # succeeds
 ```
+
+**Expect one lint warning.** Task 14's re-sync effect reads `open` while declaring
+`[value]` as its deps, so `react-hooks/exhaustive-deps` will print a warning. It is a
+warning rather than an error under `eslint-config-next/core-web-vitals`, and `npm run lint`
+carries no `--max-warnings`, so the step still exits 0. Adding `open` to the deps would
+re-run the effect on every open/close and defeat the guard.
 
 - [ ] **Commit any fixes, then use superpowers:finishing-a-development-branch**
 
