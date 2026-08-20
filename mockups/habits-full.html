@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life OS - Habits Page Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #faf8f4;
+    --card: #f2ede5;
+    --elevated: #ffffff;
+    --border: #e8e2d8;
+    --text-primary: #2c2520;
+    --text-secondary: #a0958a;
+    --text-muted: #c4b8a8;
+    --accent: #c4785a;
+    --success: #6b9e6e;
+    --warning: #c49a5a;
+    --danger: #d4493a;
+    --info: #7a8f9e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--page); color: var(--text-primary); font-family: 'Inter', system-ui, sans-serif; }
+
+  /* ===== TOP NAV (matching AppNav) ===== */
+  .top-nav { border-bottom: 1px solid var(--border); background: var(--elevated); }
+  .top-nav-inner { max-width: 1536px; margin: 0 auto; display: flex; align-items: center; height: 56px; padding: 0 24px; }
+  .top-nav .logo { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600; color: var(--text-primary); margin-right: 32px; text-decoration: none; }
+  .top-nav .logo svg { color: var(--accent); }
+  .top-nav .nav-links { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+  .top-nav .nav-link { display: flex; align-items: center; gap: 6px; padding: 8px 12px; font-size: 13px; font-weight: 500; color: var(--text-secondary); text-decoration: none; border-radius: 6px; }
+  .top-nav .nav-link:hover { color: var(--text-primary); }
+  .top-nav .nav-link.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+
+  /* ===== MAIN CONTENT ===== */
+  .main { max-width: 1536px; margin: 0 auto; padding: 24px 24px; }
+
+  /* Page header — matches Projects/Tasks */
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .page-header h1 { font-size: 22px; font-weight: 600; }
+  .btn-new { display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 13px; font-weight: 500; color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; cursor: pointer; background: transparent; }
+  .btn-new:hover { background: rgba(196,120,90,0.08); }
+
+  /* Summary strip */
+  .summary-strip { display: flex; gap: 12px; margin-bottom: 16px; }
+  .summary-card { background: var(--elevated); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; flex: 1; text-align: center; }
+  .summary-card .num { font-size: 20px; font-weight: 700; }
+  .summary-card .label { font-size: 10px; color: var(--text-secondary); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
+
+  /* Habit rows */
+  .habit-list { display: flex; flex-direction: column; gap: 4px; }
+  .habit-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--elevated); cursor: pointer; transition: box-shadow 0.15s; }
+  .habit-row:hover { box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+  .habit-check { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; cursor: pointer; }
+  .habit-check.done { background: var(--success); color: white; }
+  .habit-check.not-done { border: 2px solid var(--text-muted); }
+  .habit-name { flex: 1; font-size: 13px; font-weight: 500; }
+  .habit-schedule { font-size: 11px; color: var(--text-muted); }
+  .week-dots { display: flex; gap: 4px; align-items: center; }
+  .week-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .week-dot.done { background: var(--success); }
+  .week-dot.missed { background: var(--border); }
+  .week-dot.fail { background: var(--danger); }
+  .week-dot.future { background: var(--border); opacity: 0.4; }
+  .streak { font-size: 11px; min-width: 32px; text-align: right; font-weight: 600; }
+  .streak.active { color: var(--success); }
+  .streak.none { color: var(--text-muted); }
+
+  /* Quick add — matches Projects/Tasks QuickAdd */
+  .quick-add { display: flex; align-items: center; gap: 8px; border-top: 1px dashed var(--border); padding: 10px 14px; margin-top: 6px; }
+  .quick-add .plus { color: var(--text-muted); cursor: pointer; font-size: 16px; }
+  .quick-add .plus:hover { color: var(--accent); }
+  .quick-add input { flex: 1; background: transparent; border: none; outline: none; font-size: 13px; color: var(--text-primary); }
+  .quick-add input::placeholder { color: var(--text-muted); }
+
+  /* ===== FLYOUT PANEL (matches FlyoutPanel component) ===== */
+  .flyout-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.12); z-index: 40; pointer-events: none; }
+  .flyout { position: fixed; top: 0; right: 0; width: 480px; height: 100vh; background: var(--elevated); border-left: 1px solid var(--border); z-index: 50; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.06); }
+
+  /* Flyout header — matches FlyoutPanel */
+  .flyout-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .flyout-header h2 { font-size: 18px; font-weight: 600; }
+  .flyout-close { background: none; border: none; font-size: 20px; color: var(--text-secondary); cursor: pointer; padding: 4px; border-radius: 6px; }
+  .flyout-close:hover { background: var(--card); }
+
+  /* Flyout inline metadata — matches grey bg row from FlyoutPanel */
+  .flyout-meta { display: flex; flex-direction: column; gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border); background: #f0f0f0; }
+  .flyout-meta-row { display: flex; flex-wrap: wrap; gap: 16px; }
+  .field { display: flex; align-items: center; gap: 6px; }
+  .field-label { font-size: 11px; color: var(--text-secondary); }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+  .pill-green { background: rgba(107,158,110,0.15); color: var(--success); }
+  .pill-blue { background: rgba(122,143,158,0.15); color: var(--info); }
+
+  /* Stats bar — matches FlyoutPanel stats */
+  .stats-row { display: flex; border-bottom: 1px solid var(--border); background: var(--card); }
+  .stat { flex: 1; text-align: center; padding: 12px 8px; }
+  .stat .stat-value { font-size: 15px; font-weight: 700; }
+  .stat .stat-label { font-size: 10px; color: var(--text-secondary); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
+
+  /* Calendar heatmap */
+  .section-title { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  .heatmap-month { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .heatmap-month span { cursor: pointer; }
+  .heatmap-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 10px; }
+  .heatmap-day-label { text-align: center; font-size: 9px; color: var(--text-muted); padding: 2px 0; }
+  .heatmap-cell { aspect-ratio: 1; border-radius: 3px; cursor: pointer; }
+  .heatmap-cell.empty { background: transparent; cursor: default; }
+  .heatmap-cell.done { background: var(--success); }
+  .heatmap-cell.missed { background: var(--card); border: 1px solid var(--border); }
+  .heatmap-cell.fail { background: rgba(212,73,58,0.25); border: 1px solid var(--danger); }
+  .heatmap-cell.today { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .heatmap-cell.future { background: transparent; cursor: default; }
+  .heatmap-legend { display: flex; gap: 12px; font-size: 10px; color: var(--text-secondary); align-items: center; }
+  .heatmap-legend span { display: flex; align-items: center; gap: 4px; }
+  .legend-box { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+  /* Strength bar */
+  .strength-bar-bg { height: 8px; background: var(--card); border-radius: 4px; overflow: hidden; margin-bottom: 6px; }
+  .strength-bar-fill { height: 100%; border-radius: 4px; }
+  .strength-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+  .flyout-section { padding: 16px 20px; }
+</style>
+</head>
+<body>
+
+<!-- Top nav bar (matching existing AppNav) -->
+<nav class="top-nav">
+  <div class="top-nav-inner">
+    <a href="#" class="logo">
+      <svg width="20" height="22" viewBox="0 0 20 22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 1 L19 20 L1 20 Z M10 1 L10 20 M1 20 L19 20 M5.5 10.5 L14.5 10.5"/></svg>
+      LifeOS
+    </a>
+    <div class="nav-links">
+      <a href="#" class="nav-link">Today</a>
+      <a href="#" class="nav-link">Tasks</a>
+      <a href="#" class="nav-link">Projects</a>
+      <a href="#" class="nav-link">Goals</a>
+      <a href="#" class="nav-link active">Habits</a>
+      <a href="#" class="nav-link" style="color: var(--text-muted);">More</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Main content area -->
+<div class="main">
+  <!-- Page header -->
+  <div class="page-header">
+    <h1>Habits</h1>
+    <button class="btn-new">+ New Habit</button>
+  </div>
+
+  <!-- Summary strip -->
+  <div class="summary-strip">
+    <div class="summary-card">
+      <div class="num" style="color: var(--text-primary);">3<span style="font-size: 13px; color: var(--text-muted); font-weight: 400;"> / 5</span></div>
+      <div class="label">Done today</div>
+    </div>
+    <div class="summary-card">
+      <div class="num" style="color: var(--success);">12</div>
+      <div class="label">Best streak</div>
+    </div>
+    <div class="summary-card">
+      <div class="num" style="color: var(--info);">82%</div>
+      <div class="label">30-day rate</div>
+    </div>
+    <div class="summary-card">
+      <div class="num" style="color: var(--warning);">68%</div>
+      <div class="label">Strength</div>
+    </div>
+  </div>
+
+  <!-- Habit rows -->
+  <div class="habit-list">
+    <div class="habit-row">
+      <div class="habit-check done">&#10003;</div>
+      <div class="habit-name">Morning Run</div>
+      <span class="habit-schedule">Daily</span>
+      <div class="week-dots" title="Mon Tue Wed Thu Fri Sat Today">
+        <span class="week-dot done"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot future"></span>
+      </div>
+      <span class="streak active">12d</span>
+    </div>
+
+    <div class="habit-row">
+      <div class="habit-check done">&#10003;</div>
+      <div class="habit-name">Read 30 min</div>
+      <span class="habit-schedule">Daily</span>
+      <div class="week-dots">
+        <span class="week-dot done"></span>
+        <span class="week-dot missed"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot future"></span>
+      </div>
+      <span class="streak active">5d</span>
+    </div>
+
+    <div class="habit-row">
+      <div class="habit-check done">&#10003;</div>
+      <div class="habit-name">Meditate</div>
+      <span class="habit-schedule">3x / wk</span>
+      <div class="week-dots">
+        <span class="week-dot done"></span>
+        <span class="week-dot missed"></span>
+        <span class="week-dot missed"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot missed"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot future"></span>
+      </div>
+      <span class="streak none">3/3</span>
+    </div>
+
+    <div class="habit-row">
+      <div class="habit-check not-done"></div>
+      <div class="habit-name">No alcohol</div>
+      <span class="habit-schedule">Daily</span>
+      <div class="week-dots">
+        <span class="week-dot done"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot fail"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot future"></span>
+      </div>
+      <span class="streak active">8d</span>
+    </div>
+
+    <div class="habit-row">
+      <div class="habit-check not-done"></div>
+      <div class="habit-name">Journal</div>
+      <span class="habit-schedule">Daily</span>
+      <div class="week-dots">
+        <span class="week-dot done"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot missed"></span>
+        <span class="week-dot done"></span>
+        <span class="week-dot missed"></span>
+        <span class="week-dot future"></span>
+      </div>
+      <span class="streak none">0d</span>
+    </div>
+  </div>
+
+  <!-- Quick add -->
+  <div class="quick-add">
+    <span class="plus">+</span>
+    <input type="text" placeholder="Add habit..." disabled>
+  </div>
+</div>
+
+<!-- ===== FLYOUT (shown for "Morning Run") ===== -->
+<div class="flyout-overlay"></div>
+<div class="flyout">
+  <!-- Header -->
+  <div class="flyout-header">
+    <h2>Morning Run</h2>
+    <button class="flyout-close">&times;</button>
+  </div>
+
+  <!-- Inline metadata (grey bg, matching FlyoutPanel pattern) -->
+  <div class="flyout-meta">
+    <div class="flyout-meta-row">
+      <div class="field">
+        <span class="field-label">Polarity</span>
+        <span class="pill pill-green">Build</span>
+      </div>
+      <div class="field">
+        <span class="field-label">Metric</span>
+        <span class="pill pill-blue">Boolean</span>
+      </div>
+      <div class="field">
+        <span class="field-label">Area</span>
+        <span class="pill pill-green">Health</span>
+      </div>
+    </div>
+    <div class="flyout-meta-row">
+      <div class="field">
+        <span class="field-label">Schedule</span>
+        <span style="font-size: 12px; font-weight: 500;">Daily</span>
+      </div>
+      <div class="field">
+        <span class="field-label">Active</span>
+        <span style="font-size: 12px; font-weight: 500; color: var(--success);">Yes</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="stats-row">
+    <div class="stat">
+      <div class="stat-value" style="color: var(--success);">12</div>
+      <div class="stat-label">Current</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">28</div>
+      <div class="stat-label">Best</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" style="color: var(--info);">87%</div>
+      <div class="stat-label">30d rate</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" style="color: var(--warning);">72%</div>
+      <div class="stat-label">Strength</div>
+    </div>
+  </div>
+
+  <!-- Calendar heatmap -->
+  <div class="flyout-section">
+    <div class="section-title">History</div>
+    <div class="heatmap-month">
+      <span>&larr;</span>
+      <span>August 2026</span>
+      <span>&rarr;</span>
+    </div>
+    <div class="heatmap-grid">
+      <div class="heatmap-day-label">M</div>
+      <div class="heatmap-day-label">T</div>
+      <div class="heatmap-day-label">W</div>
+      <div class="heatmap-day-label">T</div>
+      <div class="heatmap-day-label">F</div>
+      <div class="heatmap-day-label">S</div>
+      <div class="heatmap-day-label">S</div>
+      <!-- Week 1 (Aug 1 = Sat) -->
+      <div class="heatmap-cell empty"></div>
+      <div class="heatmap-cell empty"></div>
+      <div class="heatmap-cell empty"></div>
+      <div class="heatmap-cell empty"></div>
+      <div class="heatmap-cell empty"></div>
+      <div class="heatmap-cell done"></div>
+      <div class="heatmap-cell done"></div>
+      <!-- Week 2 -->
+      <div class="heatmap-cell done"></div>
+      <div class="heatmap-cell done"></div>
+      <div class="heatmap-cell missed"></div>
+      <div class="heatmap-cell done"></div>
+      <div class="heatmap-cell done"></div>
+      <div class="heatmap-cell done"></div>
+      <div class="heatmap-cell done"></div>
+      <!-- Week 3 (current) -->
+      <div class="heatmap-cell done"></div>
+      <div class="heatmap-cell done"></div>
+      <div class="heatmap-cell done"></div>
+      <div class="heatmap-cell done"></div>
+      <div class="heatmap-cell done"></div>
+      <div class="heatmap-cell done"></div>
+      <div class="heatmap-cell missed today"></div>
+      <!-- Week 4 -->
+      <div class="heatmap-cell future"></div>
+      <div class="heatmap-cell future"></div>
+      <div class="heatmap-cell future"></div>
+      <div class="heatmap-cell future"></div>
+      <div class="heatmap-cell future"></div>
+      <div class="heatmap-cell future"></div>
+      <div class="heatmap-cell future"></div>
+      <!-- Week 5 -->
+      <div class="heatmap-cell future"></div>
+      <div class="heatmap-cell future"></div>
+      <div class="heatmap-cell future"></div>
+      <div class="heatmap-cell future"></div>
+      <div class="heatmap-cell future"></div>
+      <div class="heatmap-cell future"></div>
+      <div class="heatmap-cell future"></div>
+    </div>
+    <div class="heatmap-legend">
+      <span><span class="legend-box" style="background: var(--success);"></span> Done</span>
+      <span><span class="legend-box" style="background: var(--card); border: 1px solid var(--border);"></span> Missed</span>
+      <span><span class="legend-box" style="background: rgba(212,73,58,0.25); border: 1px solid var(--danger);"></span> Broke</span>
+      <span><span class="legend-box" style="outline: 2px solid var(--accent); outline-offset: 1px;"></span> Today</span>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- Strength -->
+  <div class="flyout-section">
+    <div class="section-title">Habit Strength</div>
+    <div class="strength-bar-bg">
+      <div class="strength-bar-fill" style="width: 72%; background: linear-gradient(90deg, var(--warning), var(--success));"></div>
+    </div>
+    <div class="strength-meta">
+      <span>72% &mdash; Building</span>
+      <span>100% = Automatic</span>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- Linked Goal -->
+  <div class="flyout-section">
+    <div class="section-title">Linked Goal</div>
+    <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px;">
+      <span style="font-size: 13px;">&#127919;</span>
+      <div>
+        <div style="font-size: 13px; font-weight: 500;">Run 5K in under 25 min</div>
+        <div style="font-size: 11px; color: var(--text-secondary);">Health &middot; Q3</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- Notes -->
+  <div class="flyout-section">
+    <div class="section-title">Notes</div>
+    <div style="border: 1px dashed var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--text-muted); min-height: 60px;">
+      Click to add...
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
