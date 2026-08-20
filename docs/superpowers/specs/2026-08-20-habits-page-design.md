@@ -1,7 +1,7 @@
 # Habits Page — Design Spec
 
 **Date:** 2026-08-20
-**Status:** Draft (rev 4 — after third spec review)
+**Status:** Draft (rev 5 — after fourth spec review)
 **Mockup:** `mockups/habits-full.html`
 **Design review:** https://claude.ai/code/artifact/163f159d-b812-4f9e-8758-7eb95fe9449c
 **Branch:** `feat/habits-page` (off `main`)
@@ -188,7 +188,13 @@ collided on a habit created mid-week.
 - A period whose `start < from` is **not** emitted. `from` here is the *fetch window's*
   start (§3.3), an arbitrary boundary, so a period straddling it would carry a target for
   time the window cannot see.
-- No period earlier than the one containing `createdAt` is emitted, whatever `from` says.
+- No period earlier than **the first period at or after `createdAt`** is emitted, whatever
+  `from` says. Phrased this way rather than "the period containing `createdAt`" because on
+  a `days` schedule there may be no such period: a Mon/Wed/Fri habit created on a Tuesday
+  falls on a day that produces no period at all, and its first period is the Wednesday.
+- `createdAt` is clamped to `min(createdAt, now)` before any of this. A future or
+  clock-skewed `created_at` would otherwise put the creation floor above the current period
+  and reopen exactly the collision this split exists to prevent.
 - The period containing `to - 1ms` — the current period — is **always** emitted where such
   a period exists, even though its `end` may lie beyond `to`. Without this, a `perWeek`
   habit's current ISO week (which ends next Monday) would never appear, and §2.4's
@@ -198,14 +204,28 @@ collided on a habit created mid-week.
 
 **(b) Creation pro-rating — controls the target of the period a habit was created in.**
 
-The period containing `createdAt` is always emitted, but its target reflects only the days
-the habit actually existed for:
+The first period at or after `createdAt` is always emitted, and its target reflects only the
+days the habit actually existed for. Pro-rating applies only when `createdAt` falls **inside**
+that period; when the first period starts after `createdAt` (the Mon/Wed/Fri-created-Tuesday
+case above) the habit existed for all of it and the target is unmodified.
 
-- `daily` and `days` — target stays **1**. A habit created at 15:00 can still be logged
-  that evening, so nothing is unreachable.
-- `perWeek` — target becomes `min(count, daysRemainingInWeekFromCreation)`. A 3×/week habit
-  created on Wednesday keeps target 3 (five days remain, so three sessions are reachable);
-  created on Saturday it takes target 2, because two days cannot hold three sessions.
+- `daily` and `days` — target stays **1**. A habit created at 15:00 can still be logged that
+  evening, so nothing is unreachable.
+- `perWeek` — target becomes `min(count, daysRemainingInWeek)`, where `daysRemainingInWeek`
+  is the **inclusive count of calendar days from `createdAt`'s local date through that
+  week's Sunday**. Created Wednesday → 5 days → target 3 (unchanged, three sessions fit).
+  Created Saturday → 2 days → target 2. Created Sunday → 1 day → target 1.
+
+**This shrinks the unreachable-target problem rather than eliminating it.** Created Saturday
+at 23:59, the target is 2 against roughly one usable day. The residual is bounded — one
+creation week, which then closes and stops mattering — and the alternative of pro-rating by
+hours rather than days is more machinery than the case deserves.
+
+**Pro-rating is not symmetric, and that is intended.** It also makes the creation week
+*easier* to score full marks on: a 3×/week habit created Saturday that logs twice scores
+`2/2 = 1.0`, a perfect week for two days of existence, which lifts `rate30d` slightly and can
+seed `bestStreak` at `1w`. The bias runs toward not judging a habit for time it did not
+exist, which is the right direction; the effect is small and decays out of the 30-day window.
 
 This is the *only* place a target is pro-rated, and the distinction from the banned
 far-edge pro-rating is principled rather than convenient: the window's `from` is an
@@ -246,10 +266,25 @@ A period **meets target** when `build: actual >= target` / `break: actual <= tar
 
 Every statistic reads the period list and never inspects `schedule` again.
 
-**Empty period list.** A habit created today, or one whose window contains no period, yields
-an empty list. `currentStreak`, `bestStreak`, `rate30d` and `strength` all return **0** in
-that case — stated explicitly because `mean()` over an empty set is `NaN`, and §12 promises
-a `0%` display.
+**Empty input sets.** Each statistic returns **0** when *its own* input set is empty. The
+guard is per-statistic, not on the period list as a whole, because the two are not the same
+set and conflating them hides a real bug:
+
+- `rate30d` filters the list down to **closed** periods in the last 30 days. A habit created
+  today has exactly one period — today's, open — so the list is non-empty while
+  `rate30d`'s input set is empty. `mean()` over that empty set is `NaN`, and §12 promises
+  `0%`. The exposure is not brief: a **per-week** habit has no closed period until the
+  following Monday, so it would read `NaN` for up to seven days, and §4.5's rate card
+  averages across habits, so one new per-week habit would poison the whole card for a week.
+  This is the first thing that happens on a brand-new page.
+- `strength`, `currentStreak` and `bestStreak` read the full period list and already behave
+  correctly on a one-open-period habit (EWMA of a single score-0 period → 0; an open unmet
+  period is skipped → 0; no met period → 0). They are guarded anyway for the genuinely
+  empty case.
+
+`rate30d` is the only statistic with an independent filter, so it is the only one where the
+distinction bites — but it is stated as a general rule so a fourth statistic added later
+inherits it.
 
 - **`currentStreak`** — walk backwards from the most recent period, counting consecutive
   periods that met target. Phrased on *the most recent period*, not on "today", because a
@@ -422,7 +457,7 @@ are separate queries with separate keys:
 | Window | Key | Range | Feeds |
 |---|---|---|---|
 | Stats | `["habit-logs", fromISO, toISO]` | today-anchored, 365 days, fixed | Summary strip, row dots, row `currentStreak` |
-| Flyout | `["habit-logs", habitId]` | unbounded, single habit | Flyout stats bar incl. all-time `bestStreak`, heatmap at any month |
+| Flyout | `["habit-logs", habitId]` | unbounded, single habit; passes `from = createdAt` | Flyout stats bar incl. all-time `bestStreak`, heatmap at any month |
 
 Paging the heatmap back to March changes nothing about the list's numbers, because the list
 never reads the flyout's query.
@@ -614,6 +649,14 @@ Takes the unit of the habit's period:
   with `3w` beneath. On a per-week habit the fraction is the fact wanted at a glance and
   the streak is secondary; the two lines mirror the name-and-subtitle pair on the left.
 
+**The fraction is `period.actual / period.target` of the current period** — never
+`schedule.count`. In the creation week those differ, because §2.2(b) pro-rates: a 3×/week
+habit created on Saturday shows `1/2`, not `1/3`, while the subtitle still reads "3× /
+week". That is correct rather than inconsistent — the denominator is what the user needs to
+hit *this* week, the subtitle is the ongoing rule — and it lasts one week. Using
+`schedule.count` instead would put the accent rule and the fraction in disagreement, showing
+`2/3` on a week already met.
+
 ## 6. The flyout
 
 Same slide-over geometry and escape-to-close behaviour as existing panels. Everything below
@@ -768,8 +811,15 @@ environment.
   `count: Infinity`, `days: []`, all seven days, `days: [0]` (JavaScript convention), null,
   `{}`, and unrecognised `type` all fall back to daily. `NaN` and `3.5` are called out
   because a two-sided bounds check would let both through.
-- **Empty period list** — a habit created today returns 0 for all four statistics, never
-  `NaN`
+- **Empty input sets** — a habit created **today** has one open period and therefore a
+  *non-empty* period list, but zero closed periods, so `rate30d` must return 0 rather than
+  `NaN`. Assert the same for a **per-week** habit created mid-week, whose first period does
+  not close until the following Monday. Written against the closed-period set, not the
+  period list — the wrong precondition would let this pass while the bug shipped.
+- **A `days` habit created on a non-required day** — a Mon/Wed/Fri habit created on Tuesday
+  has its first period on the Wednesday, at full target, with no pro-rating
+- **Clock skew** — a `created_at` in the future is clamped to `now` and does not eliminate
+  the current period
 - **Period generation** for all three shapes, including a specific-days habit producing no
   period on a non-required day
 - **`from`-edge trimming** — a window edge cutting through an ISO week emits no partial
@@ -831,10 +881,16 @@ Run after implementation, before merge:
 11. Link a habit to a KR from Goals; confirm the KR shows a rate and no check circle
 12. Mark that KR done; confirm the habit is unaffected
 13. Confirm a Mon/Wed/Fri habit is absent from Today on a Tuesday
-14. With no habits, confirm the empty state renders and QuickAdd is focused
-15. Break the Supabase URL; confirm the error row and retry action appear rather than a
+14. **Create a habit and check the summary strip immediately: the 30-day rate must read
+    `0%`, never `NaN%`. Repeat with a 3×/week habit, which has no closed period for up to a
+    week, and confirm it does not poison the strip's average**
+15. Confirm "On track" counts a per-week habit that met its target earlier in the week
+16. With only break habits visible, confirm "On track" and "At risk" read `—` with the
+    "no build habits" caption rather than `0 / 0`
+17. With no habits, confirm the empty state renders and QuickAdd is focused
+18. Break the Supabase URL; confirm the error row and retry action appear rather than a
     blank page
-16. Fail a `SchedulePicker` save; confirm the popover stays open with the previous value
+19. Fail a `SchedulePicker` save; confirm the popover stays open with the previous value
 
 ## 11. Decisions taken
 
@@ -855,7 +911,9 @@ Run after implementation, before merge:
 | Summary label | "On track", not "Done today" — the latter is false for per-week habits |
 | Paint vs click | `dotState` paints, `canBackfill` enables — separate predicates |
 | Test scope | Vitest for the pure module; no jsdom/RTL, no component tests |
-| Summary strip | Unit-free metrics only; "best streak" replaced by "at risk"; "done today" and "at risk" count build habits only |
+| Summary strip | Unit-free metrics only; "best streak" replaced by "at risk"; "on track" and "at risk" count build habits only |
+| Empty-set guard | Per-statistic, on each statistic's own input set — not on the period list |
+| Streak-slot denominator | `period.target`, so the creation week reads `n/2` against a "3× / week" subtitle |
 | `count: 1` | Normalised to daily rather than supported as a distinct shape |
 
 ## 12. Error and empty states
