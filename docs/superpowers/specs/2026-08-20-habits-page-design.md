@@ -1,7 +1,7 @@
 # Habits Page — Design Spec
 
 **Date:** 2026-08-20
-**Status:** Draft (rev 5 — after fourth spec review)
+**Status:** Approved by spec review (rev 6) — pending user review
 **Mockup:** `mockups/habits-full.html`
 **Design review:** https://claude.ai/code/artifact/163f159d-b812-4f9e-8758-7eb95fe9449c
 **Branch:** `feat/habits-page` (off `main`)
@@ -188,10 +188,18 @@ collided on a habit created mid-week.
 - A period whose `start < from` is **not** emitted. `from` here is the *fetch window's*
   start (§3.3), an arbitrary boundary, so a period straddling it would carry a target for
   time the window cannot see.
-- No period earlier than **the first period at or after `createdAt`** is emitted, whatever
-  `from` says. Phrased this way rather than "the period containing `createdAt`" because on
-  a `days` schedule there may be no such period: a Mon/Wed/Fri habit created on a Tuesday
-  falls on a day that produces no period at all, and its first period is the Wednesday.
+- No period earlier than **the first period whose `end` is after `createdAt`** is emitted,
+  whatever `from` says — that is, the first period not already finished when the habit was
+  created. Phrased on `end` rather than "the period containing `createdAt`" because on a
+  `days` schedule there may be no containing period: a Mon/Wed/Fri habit created on a
+  Tuesday falls on a day that produces no period at all, and its first period is the
+  Wednesday.
+
+  Note the phrasing carefully. "The first period **at or after** `createdAt`" would read as
+  `start >= createdAt`, which is wrong in both directions: a daily habit created at 15:00
+  would not start until tomorrow, contradicting (b) below, and a per-week habit created on
+  Wednesday would not start until next Monday — precisely the alternative rejected at the
+  end of this section. It would also make (b)'s pro-rating branch unreachable.
 - `createdAt` is clamped to `min(createdAt, now)` before any of this. A future or
   clock-skewed `created_at` would otherwise put the creation floor above the current period
   and reopen exactly the collision this split exists to prevent.
@@ -204,10 +212,11 @@ collided on a habit created mid-week.
 
 **(b) Creation pro-rating — controls the target of the period a habit was created in.**
 
-The first period at or after `createdAt` is always emitted, and its target reflects only the
-days the habit actually existed for. Pro-rating applies only when `createdAt` falls **inside**
-that period; when the first period starts after `createdAt` (the Mon/Wed/Fri-created-Tuesday
-case above) the habit existed for all of it and the target is unmodified.
+That first period is always emitted, and its target reflects only the days the habit
+actually existed for. Pro-rating applies only when `createdAt` falls **inside** that period
+— `start <= createdAt < end`. When the period starts after `createdAt` (the
+Mon/Wed/Fri-created-Tuesday case above) the habit existed for all of it and the target is
+unmodified.
 
 - `daily` and `days` — target stays **1**. A habit created at 15:00 can still be logged that
   evening, so nothing is unreachable.
@@ -317,6 +326,13 @@ inherits it.
   **periods** rather than raw days, each contributing its `periodScore`. Output is identical
   to the current model for daily build habits; a perfect 3-of-3 week now scores 1.0 rather
   than being penalised for four rest days.
+
+  **`strength` includes the open period, where `rate30d` excludes it.** The asymmetry is
+  deliberate. `rate30d` is a scoreboard — a mid-period reading dragged down by a week still
+  in progress would simply be wrong. `strength` is a live trajectory, so the visible
+  consequence is that a habit sitting at 90% reads about 84% each morning and climbs back on
+  logging. That decay-and-recover is the meter doing its job, and it matches the EWMA model
+  the existing SQL view uses.
 
 - **`unit`** — `'day'` for daily and specific-days, `'week'` for per-week, so the UI renders
   `12d` vs `3w` without re-deriving it.
@@ -928,7 +944,8 @@ Run after implementation, before merge:
 | Heatmap backfill failure | Cell reverts + `Toast` |
 | `SchedulePicker` save failure | Popover stays open, previous value restored, `Toast` |
 | Link / unlink failure | `Toast`; KR list refetches |
-| Habit with no logs at all | Streak `0`, rate `0%`, strength `0%`, empty heatmap — not `—`. §2.4's empty-list rule is what produces this rather than `NaN` |
+| Habit with no logs at all | Streak `0`, rate `0%`, strength `0%`, empty heatmap — not `—`. §2.4's per-statistic empty-set guard is what produces this rather than `NaN` |
+| Filter matches zero habits | All four summary cards render `—`. §4.5's cards are `mean()` across *visible* habits, a second empty set one layer above §2.4's guard, reachable whenever the area filter excludes everything |
 
 ## 13. Risks
 
