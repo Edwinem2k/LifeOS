@@ -1,0 +1,25 @@
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import './supabase.js'; // Triggers startup validation
+
+// Tool imports are added as each tool file is built
+// import { registerTaskTools } from './tools/tasks.js';
+
+const server = new McpServer({
+  name: 'lifeos',
+  version: '0.1.0',
+});
+
+// Tool registrations
+// registerTaskTools(server);
+
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error('LifeOS MCP server running on stdio');
+}
+
+main().catch((err) => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});
