@@ -2991,12 +2991,18 @@ circle, because a habit is never done."
 ```bash
 npm test          # habit-stats suite green
 npx tsc --noEmit  # clean
-npm run lint      # exits 0; see the note below
 npm run build     # succeeds
+
+# Lint ONLY the files this work touched. A bare `npm run lint` reports 264
+# problems (236 errors) on this repo as of 21 Aug — eslint.config.mjs does not
+# ignore `mcp/`, so it lints the MCP package's compiled dist/ output. That is a
+# pre-existing condition that arrived with the MCP merge and is not this work's
+# to fix; a whole-repo gate would be meaningless here.
+npx eslint src/lib/habit-stats.ts src/lib/habit-stats.test.ts            src/services/habits.ts src/hooks/use-habits.ts            src/components/app/HabitRow.tsx src/components/app/HabitFlyout.tsx            src/components/app/HabitHeatmap.tsx src/components/app/SchedulePicker.tsx            "src/app/(app)/habits/page.tsx"
 ```
 
-**Expect one lint warning.** Task 14's re-sync effect reads `open` while declaring
-`[value]` as its deps, so `react-hooks/exhaustive-deps` will print a warning. It is a
+**Expect one lint warning** from the scoped command above. Task 14's re-sync effect reads
+`open` while declaring `[value]` as its deps, so `react-hooks/exhaustive-deps` will warn. It is a
 warning rather than an error under `eslint-config-next/core-web-vitals`, and `npm run lint`
 carries no `--max-warnings`, so the step still exits 0. Adding `open` to the deps would
 re-run the effect on every open/close and defeat the guard.
