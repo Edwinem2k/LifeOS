@@ -755,6 +755,15 @@ git add src/lib/habit-stats.ts src/lib/habit-stats.test.ts
 git commit -m "feat: add period generator with polarity-aware targets"
 ```
 
+> **Amended during execution (21 Aug, commit `c3b5e20`).** Code review flagged that the
+> `emit` closure — the file's subtlest logic, and the clause behind two of the defects this
+> plan documents — was reachable only through full `periods()` calls and so had no direct
+> test. It is now an exported module-level predicate, `overlapsWindow(start, end, from,
+> created)`, with its own five-assertion `describe` block covering both failure modes it
+> guards. `periods()` calls it at the same two sites; behaviour is unchanged and all 48
+> prior tests passed untouched. The rename was part of the fix: `if (!emit(...)) continue;`
+> scanned as "don't emit" rather than "failed a check".
+
 ---
 
 ## Chunk 2: Statistics module - scoring and predicates
