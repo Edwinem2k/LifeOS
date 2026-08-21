@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   startOfDay, addDays, isoWeekday, startOfWeek, normalizeSchedule, periods,
-  overlapsWindow, computeStats,
+  overlapsWindow, computeStats, isRequiredOn, canBackfill, dotState,
 } from "./habit-stats";
 
 /* ================================================================== */
@@ -533,5 +533,84 @@ describe("computeStats — unit", () => {
     expect(stats(daily, MON17, [], THU20_NOON, NEXT_MIDNIGHT).unit).toBe("day");
     expect(stats({ kind: "days", days: [1, 3, 5] }, MON17, [], THU20_NOON, NEXT_MIDNIGHT).unit).toBe("day");
     expect(stats({ kind: "perWeek", count: 3 }, MON17, [], THU20_NOON, NEXT_MIDNIGHT).unit).toBe("week");
+  });
+});
+
+const MWF = { kind: "days" as const, days: [1, 3, 5] };
+const DAILY_S = { kind: "daily" as const };
+const X3S = { kind: "perWeek" as const, count: 3 };
+
+describe("isRequiredOn — Today page filter only", () => {
+  it("is true every day for daily", () => {
+    expect(isRequiredOn({ type: "daily" }, TUE18)).toBe(true);
+  });
+
+  it("is true only on listed weekdays for a days schedule", () => {
+    expect(isRequiredOn({ type: "daily", days: [1, 3, 5] }, MON17)).toBe(true);
+    expect(isRequiredOn({ type: "daily", days: [1, 3, 5] }, TUE18)).toBe(false);
+  });
+
+  it("is true every day for per-week — any day may be used", () => {
+    expect(isRequiredOn({ type: "per_week", count: 3 }, TUE18)).toBe(true);
+  });
+
+  it("takes raw jsonb, since today_agenda supplies item_details.schedule", () => {
+    expect(isRequiredOn(null, TUE18)).toBe(true); // normalises to daily
+  });
+});
+
+describe("canBackfill", () => {
+  it("is false for a future date", () => {
+    expect(canBackfill(DAILY_S, FRI21, THU20)).toBe(false);
+  });
+
+  it("is true for a past-or-today date on daily", () => {
+    expect(canBackfill(DAILY_S, MON17, THU20)).toBe(true);
+    expect(canBackfill(DAILY_S, THU20, THU20)).toBe(true);
+  });
+
+  it("is TRUE for a per-week habit's unlogged past day", () => {
+    // An earlier spec revision made this false and so made per-week backfill
+    // impossible — the schedule where it matters most.
+    expect(canBackfill(X3S, TUE18, THU20)).toBe(true);
+  });
+
+  it("is false on an unlisted weekday of a days schedule", () => {
+    // A log there is invisible to every statistic yet would render as done.
+    expect(canBackfill(MWF, TUE18, THU20)).toBe(false);
+    expect(canBackfill(MWF, MON17, THU20)).toBe(true);
+  });
+});
+
+describe("dotState", () => {
+  it("future beats everything", () => {
+    expect(dotState(DAILY_S, "build", FRI21, THU20, false)).toBe("future");
+  });
+
+  it("logged is done for build and broke for break", () => {
+    expect(dotState(DAILY_S, "build", MON17, THU20, true)).toBe("done");
+    expect(dotState(DAILY_S, "break", MON17, THU20, true)).toBe("broke");
+  });
+
+  it("a break habit's clean past day is clean, NOT missed", () => {
+    // An earlier revision had no break branch on the final rule, so thirty
+    // successful days of abstention painted thirty red dots.
+    expect(dotState(DAILY_S, "break", MON17, THU20, false)).toBe("clean");
+  });
+
+  it("a build habit's unlogged required past day is missed", () => {
+    expect(dotState(DAILY_S, "build", MON17, THU20, false)).toBe("missed");
+  });
+
+  it("today unlogged is pending, not missed", () => {
+    expect(dotState(DAILY_S, "build", THU20, THU20, false)).toBe("pending");
+  });
+
+  it("a per-week unlogged day is idle — never red", () => {
+    expect(dotState(X3S, "build", MON17, THU20, false)).toBe("idle");
+  });
+
+  it("an off-day on a days schedule is not-required", () => {
+    expect(dotState(MWF, "build", TUE18, THU20, false)).toBe("not-required");
   });
 });

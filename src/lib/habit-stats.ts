@@ -304,3 +304,58 @@ export function computeStats(
     current,
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* Three predicates — three different questions (spec §2.5)            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * (a) Today page filter ONLY. Takes raw jsonb because today_agenda supplies
+ *     item_details.schedule, not a habits row.
+ *
+ * Known limitation (spec §8): true every day for perWeek, so a 3x/week habit
+ * already completed three times stays on Today for the rest of the week.
+ * today_agenda does not carry the week's logs, so it cannot know otherwise.
+ */
+export function isRequiredOn(rawSchedule: unknown, date: Date): boolean {
+  const s = normalizeSchedule(rawSchedule);
+  if (s.kind === "days") return s.days.includes(isoWeekday(date));
+  return true;
+}
+
+/** (b) Can this heatmap cell be clicked to log or clear that date? */
+export function canBackfill(
+  schedule: NormalizedSchedule,
+  date: Date,
+  today: Date,
+): boolean {
+  if (startOfDay(date) > startOfDay(today)) return false;
+  // An off-day log is invisible to every statistic (periods() emits nothing
+  // for it) yet would render as done — a cell that lies about its own effect.
+  if (schedule.kind === "days") return schedule.days.includes(isoWeekday(date));
+  return true;
+}
+
+export type DotState =
+  | "future" | "done" | "broke" | "idle"
+  | "not-required" | "pending" | "missed" | "clean";
+
+/** (c) How is this dot or heatmap cell painted? Ordered rules, first match wins. */
+export function dotState(
+  schedule: NormalizedSchedule,
+  polarity: Polarity,
+  date: Date,
+  today: Date,
+  logged: boolean,
+): DotState {
+  const d = startOfDay(date);
+  const t = startOfDay(today);
+
+  if (d > t) return "future";                                    // 1
+  if (logged) return polarity === "build" ? "done" : "broke";    // 2
+  if (schedule.kind === "perWeek") return "idle";                // 3
+  if (schedule.kind === "days" && !schedule.days.includes(isoWeekday(d)))
+    return "not-required";                                       // 4
+  if (d.getTime() === t.getTime()) return "pending";             // 5
+  return polarity === "build" ? "missed" : "clean";              // 6
+}
