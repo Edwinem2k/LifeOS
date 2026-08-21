@@ -33,7 +33,10 @@ export default function HabitsPage() {
   const habitsQuery = useHabits(showInactive);
   const logsQuery = useHabitLogs(from, to);
   const habits = habitsQuery.data;
-  const logs = logsQuery.data ?? [];
+  // Memoized for the same reason `today` is: `?? []` mints a fresh array on
+  // every render while the query is loading, which defeats the `allRows`
+  // useMemo below and recomputes every habit's statistics each pass.
+  const logs = useMemo(() => logsQuery.data ?? [], [logsQuery.data]);
 
   const createHabit = useCreateHabit();
   const updateHabit = useUpdateHabit();
