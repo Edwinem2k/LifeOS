@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   startOfDay, addDays, isoWeekday, startOfWeek, normalizeSchedule, periods,
+  overlapsWindow,
 } from "./habit-stats";
 
 /* ================================================================== */
@@ -272,5 +273,36 @@ describe("periods — per week", () => {
     const JAN1_NOW = new Date(2027, 0, 1, 12);
     const p = periods(X3, "build", DEC28, [], EPOCH, new Date(2027, 0, 2), JAN1_NOW);
     expect(p).toHaveLength(1);
+  });
+});
+
+describe("overlapsWindow — the window trim predicate", () => {
+  const JUL1 = new Date(2026, 6, 1);
+
+  it("admits a period starting inside the window", () => {
+    expect(overlapsWindow(WED19, THU20, MON17, JUL1)).toBe(true);
+  });
+
+  it("rejects a period entirely before the window", () => {
+    expect(overlapsWindow(JUL1, new Date(2026, 6, 2), MON17, JUL1)).toBe(false);
+  });
+
+  it("admits the creation period even when it starts before `from`", () => {
+    // startOfWeek(createdAt) < createdAt, so the flyout's from = createdAt
+    // would otherwise delete the week being pro-rated.
+    expect(overlapsWindow(MON17, new Date(2026, 7, 24), WED19, WED19)).toBe(true);
+  });
+
+  it("does NOT admit a creation period that ended before the window", () => {
+    // The phantom-period bug: without `end > from`, a habit created in 2023
+    // emits a lone period two years adrift from the rest of the list.
+    const created2023 = new Date(2023, 0, 2);
+    expect(
+      overlapsWindow(created2023, new Date(2023, 0, 3), MON17, created2023),
+    ).toBe(false);
+  });
+
+  it("rejects a non-creation period straddling the window start", () => {
+    expect(overlapsWindow(MON17, THU20, WED19, JUL1)).toBe(false);
   });
 });

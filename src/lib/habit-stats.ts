@@ -91,6 +91,25 @@ export type Period = {
 export type HabitLog = { loggedAt: Date };
 
 /**
+ * Does a period survive the window trim?
+ *
+ * Three clauses, each load-bearing:
+ *   - `start >= from` — the ordinary case, the period starts inside the window.
+ *   - `start <= created && created < end` — the habit's CREATION period is
+ *     protected from the trim even when it starts before `from`, so it can be
+ *     pro-rated. Without this the flyout's `from = createdAt` deletes the very
+ *     week that needs pro-rating, since startOfWeek(createdAt) < createdAt.
+ *   - `end > from` — bounds that protection. Without it a habit created in 2023
+ *     viewed through a 365-day window emits a lone phantom period two years
+ *     before everything else in the list.
+ */
+export function overlapsWindow(
+  start: Date, end: Date, from: Date, created: Date,
+): boolean {
+  return start >= from || (start <= created && created < end && end > from);
+}
+
+/**
  * Oldest-first list of periods.
  *
  * `to` is the exclusive end of the range of interest and callers ALWAYS
@@ -115,24 +134,17 @@ export function periods(
   const loggedDays = new Set(logs.map((l) => startOfDay(l.loggedAt).getTime()));
   const out: Period[] = [];
 
-  /**
-   * Window trimming, with the creation period protected — but only while it
-   * still overlaps the window. Unbounded protection emits a phantom period
-   * years before everything else.
-   */
-  const emit = (start: Date, end: Date) =>
-    start >= from || (start <= created && created < end && end > from);
-
   if (schedule.kind === "perWeek") {
-    // Start at the later boundary. With the bounded `emit` above, anything
-    // earlier would be rejected anyway, so this only avoids wasted iterations.
+    // Start at the later boundary. With the bounded `overlapsWindow` above,
+    // anything earlier would be rejected anyway, so this only avoids wasted
+    // iterations.
     const first = startOfWeek(created);
     const windowFirst = startOfWeek(from);
     let ws = windowFirst > first ? windowFirst : first;
 
     for (; ws < to; ws = addDays(ws, 7)) {
       const we = addDays(ws, 7);
-      if (!emit(ws, we)) continue;
+      if (!overlapsWindow(ws, we, from, created)) continue;
 
       let target = schedule.count;
       // Pro-rate ONLY a BUILD habit's creation week. For break polarity
@@ -171,7 +183,7 @@ export function periods(
     if (!required) continue;
 
     const end = addDays(d, 1);
-    if (!emit(d, end)) continue;
+    if (!overlapsWindow(d, end, from, created)) continue;
 
     out.push({
       start: d,
