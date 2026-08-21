@@ -98,7 +98,7 @@ export default function TodayPage() {
                     className="flex items-center gap-3 py-2 px-3 rounded-sm hover:bg-card"
                   >
                     <button
-                      onClick={() => logHabit.mutate(habit.item_id)}
+                      onClick={() => logHabit.mutate({ habitId: habit.item_id })}
                       className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-semibold transition-colors ${
                         habit.item_details?.logged_today
                           ? "border-accent-success bg-accent-success text-white"
