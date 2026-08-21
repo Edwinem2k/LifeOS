@@ -38,15 +38,6 @@ export function SchedulePicker({ value, onSave }: Props) {
     if (n.kind === "days") setDays(n.days);
   }, [value]);
 
-  useEffect(() => {
-    if (!open) return;
-    function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) void commit();
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [open, kind, count, days]);
-
   function serialise(): object {
     if (kind === "perWeek") return { type: "per_week", count };
     if (kind === "days") return { type: "daily", days: [...days].sort((a, b) => a - b) };
@@ -80,6 +71,15 @@ export function SchedulePicker({ value, onSave }: Props) {
       // stays open
     }
   }
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) void commit();
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open, kind, count, days]);
 
   function toggleDay(d: number) {
     setDays((prev) => {

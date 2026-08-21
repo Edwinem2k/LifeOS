@@ -3010,8 +3010,21 @@ npm run build     # succeeds
 npx eslint src/lib/habit-stats.ts src/lib/habit-stats.test.ts            src/services/habits.ts src/hooks/use-habits.ts            src/components/app/HabitRow.tsx src/components/app/HabitFlyout.tsx            src/components/app/HabitHeatmap.tsx src/components/app/SchedulePicker.tsx            "src/app/(app)/habits/page.tsx"
 ```
 
-**Expect one lint warning** from the scoped command above. Task 14's re-sync effect reads
-`open` while declaring `[value]` as its deps, so `react-hooks/exhaustive-deps` will warn. It is a
+**Expect three lint problems from `SchedulePicker.tsx`** in the scoped command above — one
+error and two warnings, all inherent to the click-outside popover pattern this codebase
+already uses in `NotePopover.tsx`:
+
+- `set-state-in-effect` error on the re-sync effect. `NotePopover:17` has the same.
+- `exhaustive-deps` on `open` — deliberate. Adding `open` to the deps would re-run the
+  effect on every open/close and defeat the guard that stops a background refetch wiping an
+  edit in progress.
+- `exhaustive-deps` on `commit` — same shape as `NotePopover:29`'s missing `handleSave`.
+
+A fourth problem, `Cannot access variable before it is declared`, appeared during execution
+and was **fixed** rather than accepted (commit `6b6135e` amended): `serialise`,
+`resetToProp` and `commit` now sit above the effect that calls `commit`. Function
+declarations hoist, so this was pure reordering — but `NotePopover` does not produce that
+error, so it was genuinely introduced here rather than inherited. It is a
 warning rather than an error under `eslint-config-next/core-web-vitals`, and `npm run lint`
 carries no `--max-warnings`, so the step still exits 0. Adding `open` to the deps would
 re-run the effect on every open/close and defeat the guard.
