@@ -225,7 +225,10 @@ export type HabitStats = {
   current: Period | null; // the open period, for the row fraction and summary cards
 };
 
-const EWMA_ALPHA = 2 / 31; // span 30, matching the existing SQL model
+// Span 30, matching the existing SQL view's model. Derived rather than
+// written as 2/31 so the span is editable without reverse-engineering it.
+const EWMA_SPAN = 30;
+const EWMA_ALPHA = 2 / (EWMA_SPAN + 1);
 
 export function computeStats(
   schedule: NormalizedSchedule,

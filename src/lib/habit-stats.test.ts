@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   startOfDay, addDays, isoWeekday, startOfWeek, normalizeSchedule, periods,
   overlapsWindow, computeStats, isRequiredOn, canBackfill, dotState,
+  periodScore, meetsTarget,
 } from "./habit-stats";
 
 /* ================================================================== */
@@ -612,5 +613,60 @@ describe("dotState", () => {
 
   it("an off-day on a days schedule is not-required", () => {
     expect(dotState(MWF, "build", TUE18, THU20, false)).toBe("not-required");
+  });
+});
+
+/* ================================================================== */
+/* Gaps found in the module-completion review (21 Aug)                */
+/* ================================================================== */
+
+describe("periodScore and meetsTarget — direct coverage", () => {
+  // Both were previously exercised only through computeStats, so an
+  // off-by-one here could survive if computeStats' assertions happened
+  // not to expose it.
+  const period = (target: number, actual: number) => ({
+    start: MON17, end: TUE18, target, actual, closed: true,
+  });
+
+  it("build: gives partial credit and caps at 1", () => {
+    expect(periodScore(period(3, 2), "build")).toBeCloseTo(2 / 3);
+    expect(periodScore(period(3, 5), "build")).toBe(1);
+    expect(periodScore(period(3, 0), "build")).toBe(0);
+  });
+
+  it("build: a zero target scores on presence, avoiding a divide", () => {
+    expect(periodScore(period(0, 1), "build")).toBe(1);
+    expect(periodScore(period(0, 0), "build")).toBe(0);
+  });
+
+  it("break: scores the ceiling, never divides", () => {
+    expect(periodScore(period(0, 0), "break")).toBe(1); // clean day
+    expect(periodScore(period(0, 1), "break")).toBe(0); // broke it
+    expect(periodScore(period(3, 3), "break")).toBe(1); // at the allowance
+    expect(periodScore(period(3, 4), "break")).toBe(0); // over it
+  });
+
+  it("meetsTarget flips its comparison on polarity", () => {
+    expect(meetsTarget(period(3, 3), "build")).toBe(true);
+    expect(meetsTarget(period(3, 2), "build")).toBe(false);
+    expect(meetsTarget(period(0, 0), "break")).toBe(true);
+    expect(meetsTarget(period(0, 1), "break")).toBe(false);
+  });
+});
+
+describe("dotState — rule-order edge cases", () => {
+  it("a per-week habit's unlogged TODAY is idle, not pending", () => {
+    // Rule 3 (perWeek) fires before rule 5 (today). Every other `idle`
+    // assertion uses a PAST date, so this is the one that pins the order.
+    expect(dotState(X3S, "build", THU20, THU20, false)).toBe("idle");
+  });
+
+  it("a log on a non-required day paints done — the known quirk", () => {
+    // canBackfill forbids creating this through the UI, but the MCP server
+    // or an agent can write it directly. periods() emits no period for that
+    // day so no statistic reflects it, yet rule 2 precedes rule 4 and paints
+    // it done. Pinned so a refactor cannot silently change it either way.
+    expect(canBackfill(MWF, TUE18, THU20)).toBe(false);
+    expect(dotState(MWF, "build", TUE18, THU20, true)).toBe("done");
   });
 });
