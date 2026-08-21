@@ -68,7 +68,7 @@ For a build habit, pro-rating the creation week *lowers* an unreachable goal —
 
 ### Task 1: Vitest setup
 
-The web app has no test runner. `package.json` scripts are `dev`/`build`/`start`/`lint` and there are zero test files under `src/`. On this branch `mcp/` holds only untracked `dist/` and `node_modules/`; the MCP package's own vitest setup lives on `feat/mcp-server` and is not available here.
+The web app has no test runner. `package.json` scripts are `dev`/`build`/`start`/`lint` and there are zero test files under `src/`. `mcp/` now has its own `package.json` and `vitest.config.ts` (merged from main on 21 Aug), but that is a **separate package** with its own config, deps and `tsconfig`, and the root `tsconfig.json` excludes `mcp` entirely. It is a useful reference, not something the root config can reuse — the root needs its own vitest install and config.
 
 **Files:**
 - Modify: `package.json`
