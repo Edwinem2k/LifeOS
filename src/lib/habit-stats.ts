@@ -73,3 +73,113 @@ export function normalizeSchedule(raw: unknown): NormalizedSchedule {
 
   return DAILY;
 }
+
+/* ------------------------------------------------------------------ */
+/* Period generation (spec §2.2)                                       */
+/* ------------------------------------------------------------------ */
+
+export type Polarity = "build" | "break";
+
+export type Period = {
+  start: Date;     // inclusive, local midnight
+  end: Date;       // exclusive, local midnight
+  target: number;  // a GOAL for build, a CEILING for break
+  actual: number;  // distinct days logged within [start, end)
+  closed: boolean; // end <= now
+};
+
+export type HabitLog = { loggedAt: Date };
+
+/**
+ * Oldest-first list of periods.
+ *
+ * `to` is the exclusive end of the range of interest and callers ALWAYS
+ * pass tomorrow's local midnight — that is what makes today's daily period
+ * whole and "the current period" well defined everywhere.
+ *
+ * `now` is injected so tests are deterministic.
+ */
+export function periods(
+  schedule: NormalizedSchedule,
+  polarity: Polarity,
+  createdAt: Date,
+  logs: HabitLog[],
+  from: Date,
+  to: Date,
+  now: Date = new Date(),
+): Period[] {
+  // A future or clock-skewed created_at would put the creation floor above
+  // the current period and delete it entirely.
+  const created = new Date(Math.min(createdAt.getTime(), now.getTime()));
+
+  const loggedDays = new Set(logs.map((l) => startOfDay(l.loggedAt).getTime()));
+  const out: Period[] = [];
+
+  /**
+   * Window trimming, with the creation period protected — but only while it
+   * still overlaps the window. Unbounded protection emits a phantom period
+   * years before everything else.
+   */
+  const emit = (start: Date, end: Date) =>
+    start >= from || (start <= created && created < end && end > from);
+
+  if (schedule.kind === "perWeek") {
+    // Start at the later boundary. With the bounded `emit` above, anything
+    // earlier would be rejected anyway, so this only avoids wasted iterations.
+    const first = startOfWeek(created);
+    const windowFirst = startOfWeek(from);
+    let ws = windowFirst > first ? windowFirst : first;
+
+    for (; ws < to; ws = addDays(ws, 7)) {
+      const we = addDays(ws, 7);
+      if (!emit(ws, we)) continue;
+
+      let target = schedule.count;
+      // Pro-rate ONLY a BUILD habit's creation week. For break polarity
+      // `count` is an allowance, and shrinking it would make the creation
+      // week stricter than the ongoing rule.
+      if (polarity === "build" && ws <= created && created < we) {
+        const daysRemaining = 7 - (isoWeekday(created) - 1); // inclusive
+        target = Math.min(schedule.count, daysRemaining);
+      }
+
+      let actual = 0;
+      for (let i = 0; i < 7; i++) {
+        if (loggedDays.has(addDays(ws, i).getTime())) actual++;
+      }
+
+      out.push({ start: ws, end: we, target, actual, closed: we <= now });
+    }
+    return out;
+  }
+
+  // daily and days: one period per REQUIRED day. A non-required day yields no
+  // period at all, which is what makes it neutral downstream.
+  //
+  // Target is 1 for build (do it once) and 0 for break (do it zero times).
+  // Getting this wrong makes `actual <= target` always true and break
+  // polarity completely inert.
+  const dayTarget = polarity === "break" ? 0 : 1;
+
+  const firstDay = startOfDay(created);
+  const windowFirstDay = startOfDay(from);
+  let d = windowFirstDay > firstDay ? windowFirstDay : firstDay;
+
+  for (; d < to; d = addDays(d, 1)) {
+    const required =
+      schedule.kind === "daily" || schedule.days.includes(isoWeekday(d));
+    if (!required) continue;
+
+    const end = addDays(d, 1);
+    if (!emit(d, end)) continue;
+
+    out.push({
+      start: d,
+      end,
+      target: dayTarget, // never pro-rated: a habit made at 15:00 can still be logged tonight
+      actual: loggedDays.has(d.getTime()) ? 1 : 0,
+      closed: end <= now,
+    });
+  }
+  return out;
+}
