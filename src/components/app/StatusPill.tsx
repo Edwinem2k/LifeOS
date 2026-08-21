@@ -1,8 +1,8 @@
-import { getPillColor, formatLabel } from "@/lib/constants";
+import { getPillColor, formatLabel, type PillType } from "@/lib/constants";
 
 type Props = {
   value: string;
-  type: "status" | "area" | "priority";
+  type: PillType;
 };
 
 export function StatusPill({ value, type }: Props) {

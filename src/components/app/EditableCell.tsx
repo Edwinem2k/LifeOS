@@ -5,6 +5,7 @@ import { toast } from "@/components/app/Toast";
 import { StatusPill } from "@/components/app/StatusPill";
 import { DatePicker } from "@/components/app/DatePicker";
 import { Search } from "lucide-react";
+import { type PillType } from "@/lib/constants";
 
 type Props = {
   value: string;
@@ -12,7 +13,7 @@ type Props = {
   type?: "text" | "textarea" | "select" | "date" | "number";
   options?: { value: string; label: string }[];
   displayAs?: "pill";
-  pillType?: "status" | "area" | "priority";
+  pillType?: PillType;
   placeholder?: string;
   className?: string;
   showEmptyBox?: boolean;

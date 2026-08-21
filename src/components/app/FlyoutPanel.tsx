@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { EditableCell } from "./EditableCell";
+import { type PillType } from "@/lib/constants";
 
 export type FieldConfig = {
   key: string;
@@ -12,7 +13,7 @@ export type FieldConfig = {
   section?: string;
   placeholder?: string;
   displayAs?: "pill";
-  pillType?: "status" | "area" | "priority";
+  pillType?: PillType;
   searchable?: boolean;
   inline?: boolean;
   row?: number;
