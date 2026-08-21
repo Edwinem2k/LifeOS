@@ -32,3 +32,44 @@ export function isoWeekday(d: Date): number {
 export function startOfWeek(d: Date): Date {
   return addDays(startOfDay(d), -(isoWeekday(d) - 1));
 }
+
+/* ------------------------------------------------------------------ */
+/* Schedule normalisation (spec §2.1)                                  */
+/* ------------------------------------------------------------------ */
+
+export type NormalizedSchedule =
+  | { kind: "daily" }
+  | { kind: "days"; days: number[] }      // sorted, deduped, each 1..7, length 1..6
+  | { kind: "perWeek"; count: number };   // integer 2..6
+
+const DAILY: NormalizedSchedule = { kind: "daily" };
+
+export function normalizeSchedule(raw: unknown): NormalizedSchedule {
+  if (!raw || typeof raw !== "object") return DAILY;
+  const o = raw as Record<string, unknown>;
+
+  if (o.type === "per_week") {
+    const c = o.count;
+    // ONE positive predicate, deliberately. Two negative bounds would let
+    // NaN through both while remaining typeof "number".
+    return typeof c === "number" && Number.isInteger(c) && c >= 2 && c <= 6
+      ? { kind: "perWeek", count: c }
+      : DAILY;
+  }
+
+  if (o.type === "daily") {
+    if (!Array.isArray(o.days)) return DAILY;
+    const days = Array.from(
+      new Set(
+        o.days.filter(
+          (x): x is number =>
+            typeof x === "number" && Number.isInteger(x) && x >= 1 && x <= 7,
+        ),
+      ),
+    ).sort((a, b) => a - b);
+    if (days.length === 0 || days.length === 7) return DAILY;
+    return { kind: "days", days };
+  }
+
+  return DAILY;
+}

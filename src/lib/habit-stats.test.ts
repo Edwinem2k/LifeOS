@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  startOfDay, addDays, isoWeekday, startOfWeek,
+  startOfDay, addDays, isoWeekday, startOfWeek, normalizeSchedule,
 } from "./habit-stats";
 
 /* ================================================================== */
@@ -61,5 +61,51 @@ describe("date helpers", () => {
     const a = startOfWeek(new Date(2026, 11, 28));
     const b = startOfWeek(new Date(2027, 0, 3));
     expect(a.getTime()).toBe(b.getTime());
+  });
+});
+
+describe("normalizeSchedule", () => {
+  const DAILY = { kind: "daily" };
+
+  it("keeps a valid per_week count", () => {
+    expect(normalizeSchedule({ type: "per_week", count: 3 }))
+      .toEqual({ kind: "perWeek", count: 3 });
+  });
+
+  it("keeps and sorts valid days", () => {
+    expect(normalizeSchedule({ type: "daily", days: [5, 1, 3] }))
+      .toEqual({ kind: "days", days: [1, 3, 5] });
+  });
+
+  it("dedupes days", () => {
+    expect(normalizeSchedule({ type: "daily", days: [1, 1, 3] }))
+      .toEqual({ kind: "days", days: [1, 3] });
+  });
+
+  // Each of these would poison periodScore / rate30d / strength if it survived.
+  it.each([
+    ["count 9 (unreachable in a 7-day week)", { type: "per_week", count: 9 }],
+    ["count 0 (division by zero)", { type: "per_week", count: 0 }],
+    ["count 1 (identical to a one-day schedule)", { type: "per_week", count: 1 }],
+    ["count 7 (daily by definition)", { type: "per_week", count: 7 }],
+    ["count 3.5 (non-integer)", { type: "per_week", count: 3.5 }],
+    ["count NaN", { type: "per_week", count: NaN }],
+    ["count Infinity", { type: "per_week", count: Infinity }],
+    ["count as a string", { type: "per_week", count: "3" }],
+    ["empty days", { type: "daily", days: [] }],
+    ["all seven days", { type: "daily", days: [1, 2, 3, 4, 5, 6, 7] }],
+    ["JS getDay() convention (0 = Sunday)", { type: "daily", days: [0] }],
+    ["out-of-range days", { type: "daily", days: [8, 9] }],
+    ["unrecognised type", { type: "monthly" }],
+    ["empty object", {}],
+    ["null", null],
+    ["a string", "daily"],
+  ])("falls back to daily: %s", (_label, input) => {
+    expect(normalizeSchedule(input)).toEqual(DAILY);
+  });
+
+  it("keeps valid days when mixed with invalid ones", () => {
+    expect(normalizeSchedule({ type: "daily", days: [1, 0, 3, 99] }))
+      .toEqual({ kind: "days", days: [1, 3] });
   });
 });
