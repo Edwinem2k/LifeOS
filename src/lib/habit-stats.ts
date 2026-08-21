@@ -195,3 +195,112 @@ export function periods(
   }
   return out;
 }
+
+/* ------------------------------------------------------------------ */
+/* Scoring and statistics (spec §2.3, §2.4)                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One function for both polarities, so nothing ever divides by a target
+ * that may legitimately be zero.
+ */
+export function periodScore(p: Period, polarity: Polarity): number {
+  // For break, `target` is a CEILING set by periods(): 0 for daily and
+  // specific-days, `count` as an allowance for per-week.
+  if (polarity === "break") return p.actual <= p.target ? 1 : 0;
+  if (p.target > 0) return Math.min(p.actual / p.target, 1);
+  return p.actual > 0 ? 1 : 0;
+}
+
+export function meetsTarget(p: Period, polarity: Polarity): boolean {
+  return polarity === "break" ? p.actual <= p.target : p.actual >= p.target;
+}
+
+export type HabitStats = {
+  currentStreak: number;
+  bestStreak: number;
+  rate30d: number;   // percentage, 0..100
+  strength: number;  // percentage, 0..100
+  unit: "day" | "week";
+  current: Period | null; // the open period, for the row fraction and summary cards
+};
+
+const EWMA_ALPHA = 2 / 31; // span 30, matching the existing SQL model
+
+export function computeStats(
+  schedule: NormalizedSchedule,
+  polarity: Polarity,
+  createdAt: Date,
+  logs: HabitLog[],
+  from: Date,
+  to: Date,
+  now: Date = new Date(),
+): HabitStats {
+  const ps = periods(schedule, polarity, createdAt, logs, from, to, now);
+  const unit = schedule.kind === "perWeek" ? "week" : "day";
+
+  const last = ps.length ? ps[ps.length - 1] : null;
+  const current = last && !last.closed ? last : null;
+
+  /* --- currentStreak: walk backwards over PERIODS ------------------ */
+  let currentStreak = 0;
+  let i = ps.length - 1;
+
+  if (i >= 0 && !ps[i].closed) {
+    // The open period. For build it counts only if already met; for break it
+    // is ALWAYS skipped, since the ceiling is trivially satisfied from 00:00.
+    if (polarity === "build" && meetsTarget(ps[i], polarity)) currentStreak++;
+    i--;
+  }
+  for (; i >= 0; i--) {
+    if (!meetsTarget(ps[i], polarity)) break;
+    currentStreak++;
+  }
+
+  /* --- bestStreak: longest run anywhere in the window -------------- */
+  let bestStreak = 0;
+  let run = 0;
+  for (const p of ps) {
+    if (!p.closed) continue;
+    if (meetsTarget(p, polarity)) {
+      run++;
+      if (run > bestStreak) bestStreak = run;
+    } else {
+      run = 0;
+    }
+  }
+  if (currentStreak > bestStreak) bestStreak = currentStreak;
+
+  /* --- rate30d: CLOSED periods ending in the last 30 days ---------- */
+  // Guard on THIS statistic's own input set, not on `ps`. A habit created
+  // today has a non-empty `ps` (one open period) but zero closed periods,
+  // and mean() over an empty set is NaN.
+  const cutoff = addDays(startOfDay(now), -30);
+  const recent = ps.filter((p) => p.closed && p.end > cutoff);
+  const rate30d = recent.length
+    ? (recent.reduce((a, p) => a + periodScore(p, polarity), 0) / recent.length) * 100
+    : 0;
+
+  /* --- strength: EWMA over periods, INCLUDING the open one --------- */
+  // NORMALISED weighted mean (num/den), not a zero-seeded recursion. rate30d
+  // is a scoreboard and must not be dragged down mid-period; strength is a
+  // live trajectory and should decay and recover.
+  let num = 0;
+  let den = 0;
+  for (let k = 0; k < ps.length; k++) {
+    const age = ps.length - 1 - k;      // most recent period carries weight 1
+    const w = Math.pow(1 - EWMA_ALPHA, age);
+    num += periodScore(ps[k], polarity) * w;
+    den += w;
+  }
+  const strength = den > 0 ? (num / den) * 100 : 0;
+
+  return {
+    currentStreak,
+    bestStreak,
+    rate30d: Math.round(rate30d * 10) / 10,
+    strength: Math.round(strength * 10) / 10,
+    unit,
+    current,
+  };
+}

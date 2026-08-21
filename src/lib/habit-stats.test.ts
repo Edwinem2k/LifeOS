@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   startOfDay, addDays, isoWeekday, startOfWeek, normalizeSchedule, periods,
-  overlapsWindow,
+  overlapsWindow, computeStats,
 } from "./habit-stats";
 
 /* ================================================================== */
@@ -304,5 +304,234 @@ describe("overlapsWindow — the window trim predicate", () => {
 
   it("rejects a non-creation period straddling the window start", () => {
     expect(overlapsWindow(MON17, THU20, WED19, JUL1)).toBe(false);
+  });
+});
+
+const daily = { kind: "daily" as const };
+const stats = (
+  sched: any, created: Date, logs: any[], now: Date, to: Date,
+  polarity: "build" | "break" = "build",
+) => computeStats(sched, polarity, created, logs, EPOCH, to, now);
+
+describe("computeStats — the empty-set guard", () => {
+  it("returns 0, never NaN, for a habit created today", () => {
+    // The list is NOT empty — the current period is always emitted — but
+    // rate30d filters to CLOSED periods and finds none.
+    const s = stats(daily, THU20, [], THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.rate30d).toBe(0);
+    expect(Number.isNaN(s.rate30d)).toBe(false);
+    expect(s.strength).toBe(0);
+    expect(s.currentStreak).toBe(0);
+    expect(s.bestStreak).toBe(0);
+  });
+
+  it("returns 0 for a per-week habit whose first week has not closed", () => {
+    const s = stats({ kind: "perWeek", count: 3 }, WED19, [], THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.rate30d).toBe(0);
+    expect(Number.isNaN(s.rate30d)).toBe(false);
+  });
+});
+
+describe("computeStats — currentStreak, build", () => {
+  it("survives an open unmet period", () => {
+    // Logged Mon/Tue/Wed, today (Thu) not yet. THE bug in habit_stats.
+    const s = stats(daily, MON17,
+      logsOn(new Date(2026, 7, 17, 12), new Date(2026, 7, 18, 12), new Date(2026, 7, 19, 12)),
+      THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.currentStreak).toBe(3);
+  });
+
+  it("counts the open period once it is met", () => {
+    const s = stats(daily, MON17,
+      logsOn(new Date(2026, 7, 17, 12), new Date(2026, 7, 18, 12),
+             new Date(2026, 7, 19, 12), new Date(2026, 7, 20, 12)),
+      THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.currentStreak).toBe(4);
+  });
+
+  it("breaks on a closed unmet period", () => {
+    const FRI21_NOON = new Date(2026, 7, 21, 12);
+    const s = stats(daily, MON17,
+      logsOn(new Date(2026, 7, 17, 12), new Date(2026, 7, 18, 12), new Date(2026, 7, 19, 12)),
+      FRI21_NOON, new Date(2026, 7, 22));
+    expect(s.currentStreak).toBe(0);
+  });
+});
+
+describe("computeStats — currentStreak, break", () => {
+  it("never credits the open period", () => {
+    // A break habit satisfies its ceiling at 00:00. Crediting it would award
+    // a streak before it was earned, then decrement it on logging.
+    const s = stats(daily, MON17, [], THU20_NOON, NEXT_MIDNIGHT, "break");
+    expect(s.currentStreak).toBe(3); // Mon, Tue, Wed closed and clean — NOT 4
+  });
+
+  it("breaks when the habit was logged", () => {
+    const s = stats(daily, MON17, logsOn(new Date(2026, 7, 18, 12)),
+                    THU20_NOON, NEXT_MIDNIGHT, "break");
+    expect(s.currentStreak).toBe(1); // only Wednesday
+  });
+
+  it("reports a zero streak when logged every day", () => {
+    // The regression guard: with a target of 1 instead of a 0 ceiling this
+    // returned a full streak and 100%.
+    const s = stats(daily, MON17,
+      logsOn(new Date(2026, 7, 17, 12), new Date(2026, 7, 18, 12),
+             new Date(2026, 7, 19, 12), new Date(2026, 7, 20, 12)),
+      THU20_NOON, NEXT_MIDNIGHT, "break");
+    expect(s.currentStreak).toBe(0);
+    expect(s.rate30d).toBe(0);
+  });
+});
+
+describe("computeStats — per-week streaks count weeks", () => {
+  const X3 = { kind: "perWeek" as const, count: 3 };
+
+  it("counts three consecutive met weeks as 3", () => {
+    const created = new Date(2026, 6, 27); // Mon 27 Jul
+    const logs = logsOn(
+      new Date(2026, 6, 27, 12), new Date(2026, 6, 28, 12), new Date(2026, 6, 29, 12),
+      new Date(2026, 7, 3, 12),  new Date(2026, 7, 4, 12),  new Date(2026, 7, 5, 12),
+      new Date(2026, 7, 10, 12), new Date(2026, 7, 11, 12), new Date(2026, 7, 12, 12),
+    );
+    const s = stats(X3, created, logs, THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.currentStreak).toBe(3);
+    expect(s.unit).toBe("week");
+  });
+
+  it("a mid-week 1/3 neither counts nor breaks", () => {
+    const created = new Date(2026, 7, 3);
+    const logs = logsOn(
+      new Date(2026, 7, 3, 12), new Date(2026, 7, 4, 12), new Date(2026, 7, 5, 12),
+      new Date(2026, 7, 10, 12), new Date(2026, 7, 11, 12), new Date(2026, 7, 12, 12),
+      new Date(2026, 7, 17, 12), // this week: 1 of 3, still open
+    );
+    const s = stats(X3, created, logs, THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.currentStreak).toBe(2);
+  });
+
+  it("honours a break habit's weekly allowance", () => {
+    // "At most 3 a week": 3 logs is a pass, 4 is a fail.
+    const created = new Date(2026, 7, 10); // Mon
+    const ok = logsOn(new Date(2026, 7, 10, 12), new Date(2026, 7, 11, 12),
+                      new Date(2026, 7, 12, 12));
+    const over = logsOn(...ok.map((l) => l.loggedAt), new Date(2026, 7, 13, 12));
+    expect(stats(X3, created, ok, THU20_NOON, NEXT_MIDNIGHT, "break").currentStreak).toBe(1);
+    expect(stats(X3, created, over, THU20_NOON, NEXT_MIDNIGHT, "break").currentStreak).toBe(0);
+  });
+});
+
+describe("computeStats — rate30d denominators (spec §9.2)", () => {
+  it("divides a daily habit by its closed days", () => {
+    const s = stats(daily, MON17,
+      logsOn(new Date(2026, 7, 17, 12), new Date(2026, 7, 18, 12), new Date(2026, 7, 19, 12)),
+      THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.rate30d).toBe(100); // 3 of 3 closed days
+  });
+
+  it("uses 30 closed day-periods for a long-running daily habit", () => {
+    const created = new Date(2026, 5, 1);
+    const s = stats(daily, created, [], THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.rate30d).toBe(0);
+    // and with every day logged in the window it must be exactly 100
+    const logs = Array.from({ length: 60 }, (_, i) =>
+      ({ loggedAt: new Date(2026, 6, 1 + i, 12) }));
+    expect(stats(daily, created, logs, THU20_NOON, NEXT_MIDNIGHT).rate30d).toBe(100);
+  });
+
+  it("uses only required days for a Mon/Wed/Fri habit (~13 in 30 days)", () => {
+    const MWF = { kind: "days" as const, days: [1, 3, 5] };
+    const created = new Date(2026, 5, 1);
+    const logs = Array.from({ length: 90 }, (_, i) => new Date(2026, 5, 1 + i))
+      .filter((d) => [1, 3, 5].includes(isoWeekday(d)))
+      .map((d) => ({ loggedAt: new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12) }));
+    const s = stats(MWF, created, logs, THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.rate30d).toBe(100); // every required day met
+  });
+
+  it("gives partial credit for a 2-of-3 week", () => {
+    const X3 = { kind: "perWeek" as const, count: 3 };
+    const created = new Date(2026, 7, 10);
+    const logs = logsOn(new Date(2026, 7, 10, 12), new Date(2026, 7, 11, 12));
+    const s = stats(X3, created, logs, THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.rate30d).toBeCloseTo(66.7, 0);
+  });
+
+  it("scores a break habit's clean closed period as 1", () => {
+    const s = stats(daily, MON17, [], THU20_NOON, NEXT_MIDNIGHT, "break");
+    expect(s.rate30d).toBe(100);
+  });
+
+  it("never divides by a zero target on a break habit", () => {
+    const s = stats(daily, MON17, logsOn(new Date(2026, 7, 18, 12)),
+                    THU20_NOON, NEXT_MIDNIGHT, "break");
+    expect(Number.isFinite(s.rate30d)).toBe(true);
+    expect(s.rate30d).toBeCloseTo(66.7, 0); // 2 clean of 3 closed
+  });
+});
+
+describe("computeStats — strength (spec §9.2 parity)", () => {
+  it("uses a NORMALISED weighted mean, not a zero-seeded recursion", () => {
+    // Pinned deliberately. This fixture logs all ten days including today, so
+    // the normalised weighted mean scores it 100 while a zero-seeded
+    // s = ax + (1-a)s scores 48.7 — the > 80 bound is what discriminates.
+    // Only the normalised form reproduces spec §2.4's "a habit at 90% reads
+    // about 84% each morning" (which describes an UNLOGGED open period).
+    // Drift here would be invisible in production.
+    const created = new Date(2026, 7, 11);
+    const logs = Array.from({ length: 10 }, (_, i) =>
+      ({ loggedAt: new Date(2026, 7, 11 + i, 12) }));
+    const s = stats(daily, created, logs, THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.strength).toBeGreaterThan(80);
+    expect(s.strength).toBeLessThanOrEqual(100);
+  });
+
+  it("a perfect long-running daily habit approaches 100", () => {
+    const created = new Date(2026, 5, 1);
+    const logs = Array.from({ length: 90 }, (_, i) =>
+      ({ loggedAt: new Date(2026, 5, 1 + i, 12) }));
+    expect(stats(daily, created, logs, THU20_NOON, NEXT_MIDNIGHT).strength).toBe(100);
+  });
+});
+
+describe("computeStats — timezone (spec §9.2)", () => {
+  it("buckets a 00:30 local log onto that local day", () => {
+    const s = stats(daily, MON17, logsOn(new Date(2026, 7, 18, 0, 30)),
+                    THU20_NOON, NEXT_MIDNIGHT);
+    // If it slipped to the 17th, the 18th would be a miss and the streak 0.
+    expect(s.rate30d).toBeCloseTo(33.3, 0);
+  });
+});
+
+describe("computeStats — bestStreak and current", () => {
+  it("finds the longest run, not the current one", () => {
+    const created = new Date(2026, 7, 10);
+    const logs = logsOn(
+      new Date(2026, 7, 10, 12), new Date(2026, 7, 11, 12), new Date(2026, 7, 12, 12),
+      new Date(2026, 7, 13, 12), // 4-day run, gap on the 14th
+      new Date(2026, 7, 17, 12), new Date(2026, 7, 18, 12),
+    );
+    expect(stats(daily, created, logs, THU20_NOON, NEXT_MIDNIGHT).bestStreak).toBe(4);
+  });
+
+  it("exposes the open period as `current`", () => {
+    const s = stats(daily, MON17, [], THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.current).not.toBeNull();
+    expect(s.current!.closed).toBe(false);
+  });
+
+  it("`current` is null on a non-required day of a days schedule", () => {
+    // §4.5's summary cards and §5.4's fraction must handle this.
+    const MWF = { kind: "days" as const, days: [1, 3, 5] };
+    const s = stats(MWF, MON17, [], THU20_NOON, NEXT_MIDNIGHT); // Thu is not required
+    expect(s.current).toBeNull();
+  });
+});
+
+describe("computeStats — unit", () => {
+  it("is day for daily and specific days, week for per-week", () => {
+    expect(stats(daily, MON17, [], THU20_NOON, NEXT_MIDNIGHT).unit).toBe("day");
+    expect(stats({ kind: "days", days: [1, 3, 5] }, MON17, [], THU20_NOON, NEXT_MIDNIGHT).unit).toBe("day");
+    expect(stats({ kind: "perWeek", count: 3 }, MON17, [], THU20_NOON, NEXT_MIDNIGHT).unit).toBe("week");
   });
 });
