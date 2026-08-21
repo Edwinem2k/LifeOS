@@ -3010,24 +3010,26 @@ npm run build     # succeeds
 npx eslint src/lib/habit-stats.ts src/lib/habit-stats.test.ts            src/services/habits.ts src/hooks/use-habits.ts            src/components/app/HabitRow.tsx src/components/app/HabitFlyout.tsx            src/components/app/HabitHeatmap.tsx src/components/app/SchedulePicker.tsx            "src/app/(app)/habits/page.tsx"
 ```
 
-**Expect three lint problems from `SchedulePicker.tsx`** in the scoped command above — one
-error and two warnings, all inherent to the click-outside popover pattern this codebase
-already uses in `NotePopover.tsx`:
+**Expected lint baseline for the scoped command: 13 problems (11 errors, 2 warnings).**
+Measured on 21 Aug with Tasks 1-16 landed. The gate's job is to catch *new* rule violations,
+not to reach zero — so compare the composition, not just the count.
 
-- `set-state-in-effect` error on the re-sync effect. `NotePopover:17` has the same.
-- `exhaustive-deps` on `open` — deliberate. Adding `open` to the deps would re-run the
-  effect on every open/close and defeat the guard that stops a background refetch wiping an
-  edit in progress.
-- `exhaustive-deps` on `commit` — same shape as `NotePopover:29`'s missing `handleSave`.
+| Rule | Count | Why it is accepted |
+|---|---|---|
+| `@typescript-eslint/no-explicit-any` | 10 | `src/lib/types.ts` is literally `export type Database = any`, so there are no generated Supabase row types to reference. The same rule fires in `DataTable.tsx` (×4), `FlyoutPanel.tsx` and `EditableCell.tsx`. Typing these properly means generating Supabase types — a separate piece of work, now in the Deferred table. |
+| `react-hooks/set-state-in-effect` | 1 | `SchedulePicker`'s re-sync effect. `NotePopover:17` has the same, and it is the pattern this component was told to mirror. |
+| `react-hooks/exhaustive-deps` on `open` | 1 | Deliberate. Adding `open` to the deps re-runs the effect on every open/close and defeats the guard that stops a background refetch wiping an edit in progress. |
+| `react-hooks/exhaustive-deps` on `commit` | 1 | Same shape as `NotePopover:29`'s missing `handleSave`. |
 
-A fourth problem, `Cannot access variable before it is declared`, appeared during execution
-and was **fixed** rather than accepted (commit `6b6135e` amended): `serialise`,
-`resetToProp` and `commit` now sit above the effect that calls `commit`. Function
-declarations hoist, so this was pure reordering — but `NotePopover` does not produce that
-error, so it was genuinely introduced here rather than inherited. It is a
-warning rather than an error under `eslint-config-next/core-web-vitals`, and `npm run lint`
-carries no `--max-warnings`, so the step still exits 0. Adding `open` to the deps would
-re-run the effect on every open/close and defeat the guard.
+**A new rule name appearing, or a count rising, is the signal to investigate.** During
+execution one such case appeared and was fixed rather than absorbed: `Cannot access variable
+before it is declared` in `SchedulePicker`, caused by this plan placing `serialise`,
+`resetToProp` and `commit` after the effect that calls `commit`. `NotePopover` does not
+produce that error, so it was introduced here, not inherited. Fixed by reordering (commit
+`669654e`) — function declarations hoist, so it was pure code movement.
+
+The lesson is worth keeping: "some of these problems are pre-existing" quietly becomes "all
+of them are". Check each rule against a sibling file that predates this work.
 
 - [ ] **Commit any fixes, then use superpowers:finishing-a-development-branch**
 
@@ -3039,6 +3041,7 @@ Recorded so they are decisions rather than omissions:
 
 | Item | Why |
 |---|---|
+| **Generated Supabase row types** | `src/lib/types.ts` is `export type Database = any`, which forces `any` annotations through every service, hook and component that touches a row — 10 of the 13 lint problems above. Fixing it means running Supabase type generation and threading real types through, which touches far more than Habits. |
 | Component tests for the row, heatmap and optimistic path | Needs jsdom + React Testing Library, which the app has never had. Task 20 covers it manually. |
 | **"Push to Habit"** — creating a habit from a manual KR | Spec §7.1 names it alongside the `→ Proj` / `→ Task` buttons at `goals/page.tsx:387,394`. Link-in works; push-out is a second flow on an already 968-line file. Ships separately. |
 | **Auto-focusing QuickAdd in the empty state** | Spec §12 asks for it. `QuickAdd` is a `forwardRef`, so it is a ref plus a `focus()` — but focus-stealing on mount is a real annoyance if the user arrived to read rather than add. Left to a follow-up rather than half-wired. |
