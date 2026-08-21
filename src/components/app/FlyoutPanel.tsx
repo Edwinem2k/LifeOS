@@ -35,9 +35,10 @@ type Props = {
   onSave: (field: string, value: string) => Promise<void>;
   onClose: () => void;
   autoFocusTitle?: boolean;
+  children?: React.ReactNode;
 };
 
-export function FlyoutPanel({ title, titleField = "name", fields, data, stats, onSave, onClose, autoFocusTitle = false }: Props) {
+export function FlyoutPanel({ title, titleField = "name", fields, data, stats, onSave, onClose, autoFocusTitle = false, children }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -179,6 +180,8 @@ export function FlyoutPanel({ title, titleField = "name", fields, data, stats, o
             </div>
           ))}
         </div>
+
+        {children}
       </div>
     </>
   );
