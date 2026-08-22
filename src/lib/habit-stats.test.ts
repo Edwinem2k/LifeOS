@@ -540,6 +540,8 @@ describe("computeStats — unit", () => {
 const MWF = { kind: "days" as const, days: [1, 3, 5] };
 const DAILY_S = { kind: "daily" as const };
 const X3S = { kind: "perWeek" as const, count: 3 };
+/** A created_at old enough that no date in these fixtures predates it. */
+const EARLY = new Date(2026, 0, 1);
 
 describe("isRequiredOn — Today page filter only", () => {
   it("is true every day for daily", () => {
@@ -562,57 +564,57 @@ describe("isRequiredOn — Today page filter only", () => {
 
 describe("canBackfill", () => {
   it("is false for a future date", () => {
-    expect(canBackfill(DAILY_S, FRI21, THU20)).toBe(false);
+    expect(canBackfill(DAILY_S, EARLY, FRI21, THU20)).toBe(false);
   });
 
   it("is true for a past-or-today date on daily", () => {
-    expect(canBackfill(DAILY_S, MON17, THU20)).toBe(true);
-    expect(canBackfill(DAILY_S, THU20, THU20)).toBe(true);
+    expect(canBackfill(DAILY_S, EARLY, MON17, THU20)).toBe(true);
+    expect(canBackfill(DAILY_S, EARLY, THU20, THU20)).toBe(true);
   });
 
   it("is TRUE for a per-week habit's unlogged past day", () => {
     // An earlier spec revision made this false and so made per-week backfill
     // impossible — the schedule where it matters most.
-    expect(canBackfill(X3S, TUE18, THU20)).toBe(true);
+    expect(canBackfill(X3S, EARLY, TUE18, THU20)).toBe(true);
   });
 
   it("is false on an unlisted weekday of a days schedule", () => {
     // A log there is invisible to every statistic yet would render as done.
-    expect(canBackfill(MWF, TUE18, THU20)).toBe(false);
-    expect(canBackfill(MWF, MON17, THU20)).toBe(true);
+    expect(canBackfill(MWF, EARLY, TUE18, THU20)).toBe(false);
+    expect(canBackfill(MWF, EARLY, MON17, THU20)).toBe(true);
   });
 });
 
 describe("dotState", () => {
   it("future beats everything", () => {
-    expect(dotState(DAILY_S, "build", FRI21, THU20, false)).toBe("future");
+    expect(dotState(DAILY_S, "build", EARLY, FRI21, THU20, false)).toBe("future");
   });
 
   it("logged is done for build and broke for break", () => {
-    expect(dotState(DAILY_S, "build", MON17, THU20, true)).toBe("done");
-    expect(dotState(DAILY_S, "break", MON17, THU20, true)).toBe("broke");
+    expect(dotState(DAILY_S, "build", EARLY, MON17, THU20, true)).toBe("done");
+    expect(dotState(DAILY_S, "break", EARLY, MON17, THU20, true)).toBe("broke");
   });
 
   it("a break habit's clean past day is clean, NOT missed", () => {
     // An earlier revision had no break branch on the final rule, so thirty
     // successful days of abstention painted thirty red dots.
-    expect(dotState(DAILY_S, "break", MON17, THU20, false)).toBe("clean");
+    expect(dotState(DAILY_S, "break", EARLY, MON17, THU20, false)).toBe("clean");
   });
 
   it("a build habit's unlogged required past day is missed", () => {
-    expect(dotState(DAILY_S, "build", MON17, THU20, false)).toBe("missed");
+    expect(dotState(DAILY_S, "build", EARLY, MON17, THU20, false)).toBe("missed");
   });
 
   it("today unlogged is pending, not missed", () => {
-    expect(dotState(DAILY_S, "build", THU20, THU20, false)).toBe("pending");
+    expect(dotState(DAILY_S, "build", EARLY, THU20, THU20, false)).toBe("pending");
   });
 
   it("a per-week unlogged day is idle — never red", () => {
-    expect(dotState(X3S, "build", MON17, THU20, false)).toBe("idle");
+    expect(dotState(X3S, "build", EARLY, MON17, THU20, false)).toBe("idle");
   });
 
   it("an off-day on a days schedule is not-required", () => {
-    expect(dotState(MWF, "build", TUE18, THU20, false)).toBe("not-required");
+    expect(dotState(MWF, "build", EARLY, TUE18, THU20, false)).toBe("not-required");
   });
 });
 
@@ -658,7 +660,7 @@ describe("dotState — rule-order edge cases", () => {
   it("a per-week habit's unlogged TODAY is idle, not pending", () => {
     // Rule 3 (perWeek) fires before rule 5 (today). Every other `idle`
     // assertion uses a PAST date, so this is the one that pins the order.
-    expect(dotState(X3S, "build", THU20, THU20, false)).toBe("idle");
+    expect(dotState(X3S, "build", EARLY, THU20, THU20, false)).toBe("idle");
   });
 
   it("a log on a non-required day paints done — the known quirk", () => {
@@ -666,7 +668,140 @@ describe("dotState — rule-order edge cases", () => {
     // or an agent can write it directly. periods() emits no period for that
     // day so no statistic reflects it, yet rule 2 precedes rule 4 and paints
     // it done. Pinned so a refactor cannot silently change it either way.
-    expect(canBackfill(MWF, TUE18, THU20)).toBe(false);
-    expect(dotState(MWF, "build", TUE18, THU20, true)).toBe("done");
+    expect(canBackfill(MWF, EARLY, TUE18, THU20)).toBe(false);
+    expect(dotState(MWF, "build", EARLY, TUE18, THU20, true)).toBe("done");
+  });
+});
+
+/* ================================================================== */
+/* Gaps found in Task 20's manual verification (22 Aug)               */
+/*                                                                     */
+/* Both are the same bug class: credit or blame for time before the   */
+/* habit existed, or before a period has actually been earned.        */
+/* ================================================================== */
+
+describe("dotState — days before the habit existed", () => {
+  // Created Wednesday; today is Thursday. Mon and Tue predate the habit.
+  it("paints an unlogged pre-creation day neutral for a BUILD habit", () => {
+    // Was `missed`: a habit made minutes ago showed three weeks of red.
+    expect(dotState(DAILY_S, "build", WED19, MON17, THU20, false)).toBe("pre-creation");
+    expect(dotState(DAILY_S, "build", WED19, TUE18, THU20, false)).toBe("pre-creation");
+  });
+
+  it("paints an unlogged pre-creation day neutral for a BREAK habit", () => {
+    // Was `clean`: three weeks of phantom green abstinence never earned.
+    // This is the case that matches the 100%-strength bug next door.
+    expect(dotState(DAILY_S, "break", WED19, MON17, THU20, false)).toBe("pre-creation");
+  });
+
+  it("still paints a LOGGED pre-creation day done/broke — rule order", () => {
+    // The new rule sits AFTER the `logged` check on purpose. A backfill
+    // written by the MCP server before created_at is more honestly shown
+    // than hidden. Only UNLOGGED pre-creation days go neutral.
+    expect(dotState(DAILY_S, "build", WED19, MON17, THU20, true)).toBe("done");
+    expect(dotState(DAILY_S, "break", WED19, MON17, THU20, true)).toBe("broke");
+  });
+
+  it("beats idle and not-required — those rules come later", () => {
+    expect(dotState(X3S, "build", WED19, MON17, THU20, false)).toBe("pre-creation");
+    expect(dotState(MWF, "build", WED19, MON17, THU20, false)).toBe("pre-creation");
+  });
+
+  it("does not beat future — a clock-skewed future created_at stays future", () => {
+    // Rule 1 still wins, so tomorrow never renders as pre-creation.
+    expect(dotState(DAILY_S, "build", SAT22, FRI21, THU20, false)).toBe("future");
+  });
+
+  it("compares by DAY, so the creation day itself is never pre-creation", () => {
+    // created_at carries a wall-clock time; a habit made at 15:00 today must
+    // still show today as pending, not as pre-creation.
+    const WED19_3PM = new Date(2026, 7, 19, 15, 0);
+    expect(dotState(DAILY_S, "build", WED19_3PM, WED19, THU20, false)).toBe("missed");
+    expect(dotState(DAILY_S, "build", THU20_NOON, THU20, THU20, false)).toBe("pending");
+  });
+
+  it("leaves every on-or-after-creation state exactly as it was", () => {
+    // The whole existing rule table, re-asserted with an early created_at.
+    expect(dotState(DAILY_S, "build", EARLY, FRI21, THU20, false)).toBe("future");
+    expect(dotState(DAILY_S, "build", EARLY, MON17, THU20, true)).toBe("done");
+    expect(dotState(DAILY_S, "break", EARLY, MON17, THU20, true)).toBe("broke");
+    expect(dotState(DAILY_S, "break", EARLY, MON17, THU20, false)).toBe("clean");
+    expect(dotState(DAILY_S, "build", EARLY, MON17, THU20, false)).toBe("missed");
+    expect(dotState(DAILY_S, "build", EARLY, THU20, THU20, false)).toBe("pending");
+    expect(dotState(X3S, "build", EARLY, MON17, THU20, false)).toBe("idle");
+    expect(dotState(MWF, "build", EARLY, TUE18, THU20, false)).toBe("not-required");
+  });
+});
+
+describe("canBackfill — days before the habit existed", () => {
+  it("refuses a date before the habit was created", () => {
+    // A log there would sit outside periods()' creation floor: invisible to
+    // every statistic, yet the cell would paint itself done.
+    expect(canBackfill(DAILY_S, WED19, MON17, THU20)).toBe(false);
+    expect(canBackfill(X3S, WED19, MON17, THU20)).toBe(false);
+  });
+
+  it("allows the creation day itself, whatever time of day it carries", () => {
+    const WED19_3PM = new Date(2026, 7, 19, 15, 0);
+    expect(canBackfill(DAILY_S, WED19_3PM, WED19, THU20)).toBe(true);
+  });
+
+  it("still refuses the future and unlisted weekdays", () => {
+    expect(canBackfill(DAILY_S, EARLY, FRI21, THU20)).toBe(false);
+    expect(canBackfill(MWF, EARLY, TUE18, THU20)).toBe(false);
+    expect(canBackfill(MWF, EARLY, MON17, THU20)).toBe(true);
+  });
+});
+
+describe("computeStats — strength skips the break-polarity open period", () => {
+  it("is 0, not 100, for a break habit created today with no logs", () => {
+    // The open period scores 1 from 00:00 (actual 0 <= ceiling 0), so a habit
+    // created 30 seconds ago reported 100% strength. currentStreak already
+    // skipped it; strength did not.
+    const s = stats(daily, THU20, [], THU20_NOON, NEXT_MIDNIGHT, "break");
+    expect(s.strength).toBe(0);
+    expect(s.rate30d).toBe(0); // strength now agrees with the scoreboard
+  });
+
+  it("is 0 for a break habit that has broken every closed period", () => {
+    // Discriminates the fix: with the open period included this read ~27.5%
+    // purely because today has not been broken YET.
+    const s = stats(daily, MON17,
+      logsOn(new Date(2026, 7, 17, 12), new Date(2026, 7, 18, 12),
+             new Date(2026, 7, 19, 12)),
+      THU20_NOON, NEXT_MIDNIGHT, "break");
+    expect(s.strength).toBe(0);
+  });
+
+  it("still scores a break habit's CLOSED clean periods", () => {
+    // Mon/Tue/Wed clean and closed; only the open Thursday is dropped.
+    const s = stats(daily, MON17, [], THU20_NOON, NEXT_MIDNIGHT, "break");
+    expect(s.strength).toBe(100);
+    expect(s.currentStreak).toBe(3);
+  });
+
+  it("is 0 for a per-week break habit whose first week is still open", () => {
+    const s = stats(X3S, MON17, [], THU20_NOON, NEXT_MIDNIGHT, "break");
+    expect(s.strength).toBe(0);
+  });
+});
+
+describe("computeStats — strength still INCLUDES the build open period", () => {
+  // Guard against over-applying the break fix. Spec §2.4: rate30d is a
+  // scoreboard and must not be dragged down mid-period; strength is a live
+  // trajectory and should decay and recover.
+  it("credits a build habit's open period once it is met", () => {
+    const s = stats(daily, THU20, logsOn(new Date(2026, 7, 20, 12)),
+                    THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.strength).toBe(100); // would be 0 if the open period were skipped
+  });
+
+  it("lets an unlogged open period drag strength down mid-day", () => {
+    const s = stats(daily, MON17,
+      logsOn(new Date(2026, 7, 17, 12), new Date(2026, 7, 18, 12),
+             new Date(2026, 7, 19, 12)),
+      THU20_NOON, NEXT_MIDNIGHT);
+    expect(s.strength).toBeGreaterThan(60);
+    expect(s.strength).toBeLessThan(100); // the open Thursday still counts
   });
 });

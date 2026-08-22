@@ -288,12 +288,22 @@ export function computeStats(
   // NORMALISED weighted mean (num/den), not a zero-seeded recursion. rate30d
   // is a scoreboard and must not be dragged down mid-period; strength is a
   // live trajectory and should decay and recover.
+  //
+  // The open BREAK period is dropped, exactly as currentStreak drops it: its
+  // ceiling is trivially satisfied at 00:00, so including it credited a habit
+  // created 30 seconds ago with 100% strength. Build keeps its open period —
+  // that decay-and-recover behaviour is deliberate.
+  const scored =
+    polarity === "break" && ps.length > 0 && !ps[ps.length - 1].closed
+      ? ps.slice(0, -1)
+      : ps;
+
   let num = 0;
   let den = 0;
-  for (let k = 0; k < ps.length; k++) {
-    const age = ps.length - 1 - k;      // most recent period carries weight 1
+  for (let k = 0; k < scored.length; k++) {
+    const age = scored.length - 1 - k;  // most recent period carries weight 1
     const w = Math.pow(1 - EWMA_ALPHA, age);
-    num += periodScore(ps[k], polarity) * w;
+    num += periodScore(scored[k], polarity) * w;
     den += w;
   }
   const strength = den > 0 ? (num / den) * 100 : 0;
@@ -329,10 +339,15 @@ export function isRequiredOn(rawSchedule: unknown, date: Date): boolean {
 /** (b) Can this heatmap cell be clicked to log or clear that date? */
 export function canBackfill(
   schedule: NormalizedSchedule,
+  createdAt: Date,
   date: Date,
   today: Date,
 ): boolean {
   if (startOfDay(date) > startOfDay(today)) return false;
+  // Before the habit existed. periods() floors at created_at, so a log there
+  // is invisible to every statistic — the same lie as an off-day log below.
+  // Compared by DAY: a habit created at 15:00 can still be logged for today.
+  if (startOfDay(date) < startOfDay(createdAt)) return false;
   // An off-day log is invisible to every statistic (periods() emits nothing
   // for it) yet would render as done — a cell that lies about its own effect.
   if (schedule.kind === "days") return schedule.days.includes(isoWeekday(date));
@@ -341,24 +356,35 @@ export function canBackfill(
 
 export type DotState =
   | "future" | "done" | "broke" | "idle"
-  | "not-required" | "pending" | "missed" | "clean";
+  | "not-required" | "pending" | "missed" | "clean" | "pre-creation";
 
 /** (c) How is this dot or heatmap cell painted? Ordered rules, first match wins. */
 export function dotState(
   schedule: NormalizedSchedule,
   polarity: Polarity,
+  createdAt: Date,
   date: Date,
   today: Date,
   logged: boolean,
 ): DotState {
   const d = startOfDay(date);
   const t = startOfDay(today);
+  const c = startOfDay(createdAt);
 
   if (d > t) return "future";                                    // 1
   if (logged) return polarity === "build" ? "done" : "broke";    // 2
-  if (schedule.kind === "perWeek") return "idle";                // 3
+  // Before the habit existed: neither blame nor credit. periods() clamps to
+  // created_at for exactly this reason, so without rule 3 the heatmap
+  // contradicted the statistics — weeks of red `missed` on a build habit made
+  // minutes ago, and weeks of phantom green `clean` on a break one.
+  //
+  // AFTER the `logged` check on purpose: a pre-creation log (a data anomaly,
+  // or a backfill written by the MCP server) is more honestly shown as
+  // done/broke than hidden. Only UNLOGGED pre-creation days go neutral.
+  if (d < c) return "pre-creation";                              // 3
+  if (schedule.kind === "perWeek") return "idle";                // 4
   if (schedule.kind === "days" && !schedule.days.includes(isoWeekday(d)))
-    return "not-required";                                       // 4
-  if (d.getTime() === t.getTime()) return "pending";             // 5
-  return polarity === "build" ? "missed" : "clean";              // 6
+    return "not-required";                                       // 5
+  if (d.getTime() === t.getTime()) return "pending";             // 6
+  return polarity === "build" ? "missed" : "clean";              // 7
 }

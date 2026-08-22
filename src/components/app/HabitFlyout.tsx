@@ -89,6 +89,7 @@ export function HabitFlyout({
           <HabitHeatmap
             schedule={schedule}
             polarity={polarity}
+            createdAt={new Date(habit.created_at)}
             loggedDays={loggedDays}
             today={today}
             onToggleDate={onToggleDate}

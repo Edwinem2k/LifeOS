@@ -16,6 +16,9 @@ const DOT_CLASS: Record<DotState, string> = {
   future:         "w-2.5 h-2.5 rounded-full border border-border-default",
   idle:           "w-1.5 h-1.5 rounded-full border border-border-default",
   "not-required": "w-1.5 h-1.5 rounded-full border border-border-default",
+  // Before the habit existed — styled exactly like not-required, so it can
+  // read as neither success nor failure.
+  "pre-creation": "w-1.5 h-1.5 rounded-full border border-border-default",
 };
 
 type Props = {
@@ -33,6 +36,7 @@ export function HabitRow({
   habit, schedule, stats, loggedDays, scheduleLabel, today, onToggleToday, onOpen,
 }: Props) {
   const polarity = habit.polarity as Polarity;
+  const createdAt = new Date(habit.created_at);
   const weekStart = startOfWeek(today);
   const loggedToday = loggedDays.has(startOfDay(today).getTime());
   const unitSuffix = stats.unit === "week" ? "w" : "d";
@@ -78,7 +82,7 @@ export function HabitRow({
       <div className="hidden sm:flex items-center gap-1.5 shrink-0">
         {Array.from({ length: 7 }, (_, i) => {
           const day = addDays(weekStart, i);
-          const state = dotState(schedule, polarity, day, today, loggedDays.has(day.getTime()));
+          const state = dotState(schedule, polarity, createdAt, day, today, loggedDays.has(day.getTime()));
           const isToday = startOfDay(day).getTime() === startOfDay(today).getTime();
           return (
             <span

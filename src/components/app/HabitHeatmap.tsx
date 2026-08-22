@@ -16,17 +16,21 @@ const CELL: Record<DotState, string> = {
   future:         "bg-transparent",
   idle:           "bg-card border border-border-default",
   "not-required": "bg-transparent border border-border-default/40",
+  // Before the habit existed — styled exactly like not-required, so it can
+  // read as neither success nor failure.
+  "pre-creation": "bg-transparent border border-border-default/40",
 };
 
 type Props = {
   schedule: NormalizedSchedule;
   polarity: Polarity;
+  createdAt: Date;
   loggedDays: Set<number>;
   today: Date;
   onToggleDate: (date: Date) => void;
 };
 
-export function HabitHeatmap({ schedule, polarity, loggedDays, today, onToggleDate }: Props) {
+export function HabitHeatmap({ schedule, polarity, createdAt, loggedDays, today, onToggleDate }: Props) {
   const [offset, setOffset] = useState(0); // months back from the current month
 
   const cursor = new Date(today.getFullYear(), today.getMonth() + offset, 1);
@@ -62,8 +66,8 @@ export function HabitHeatmap({ schedule, polarity, loggedDays, today, onToggleDa
         {Array.from({ length: daysInMonth }, (_, i) => {
           const date = new Date(year, month, i + 1);
           const logged = loggedDays.has(startOfDay(date).getTime());
-          const state = dotState(schedule, polarity, date, today, logged);
-          const clickable = canBackfill(schedule, date, today);
+          const state = dotState(schedule, polarity, createdAt, date, today, logged);
+          const clickable = canBackfill(schedule, createdAt, date, today);
           const isToday = startOfDay(date).getTime() === startOfDay(today).getTime();
 
           return (
