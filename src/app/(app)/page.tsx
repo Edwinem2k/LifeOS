@@ -27,11 +27,19 @@ export default function TodayPage() {
   const logHabit = useLogHabit();
 
   const tasks = agenda?.filter((item: any) => item.item_type === "task") ?? [];
+  // `today_agenda` emits every active habit and delegates the schedule filter
+  // to the client (002_views.sql:416). Not memoized deliberately: `habits`
+  // gets a fresh array every render regardless (no useMemo on this page), and
+  // pinning `today` to mount via useMemo(() => new Date(), []) would actively
+  // introduce a bug — a tab left open overnight would refetch on focus
+  // (staleTime 30s + refetchOnWindowFocus) but keep showing Monday's habits.
   const today = new Date();
   const habits =
-    agenda
-      ?.filter((item: any) => item.item_type === "habit")
-      .filter((item: any) => isRequiredOn(item.item_details?.schedule, today)) ?? [];
+    agenda?.filter(
+      (item: any) =>
+        item.item_type === "habit" &&
+        isRequiredOn(item.item_details?.schedule, today)
+    ) ?? [];
   const events = agenda?.filter((item: any) => item.item_type === "event") ?? [];
 
   const tasksDue = tasks.length;
