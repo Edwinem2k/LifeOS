@@ -88,3 +88,30 @@ export function validateMetadata(
 
   return { ok: true };
 }
+
+export type SelectOption = { value: string; label: string; seeded: boolean };
+
+/**
+ * The options offered for a select field: its seeded options, then every distinct
+ * value already used on this list. Using a value once makes it a permanent
+ * suggestion — nothing is written back to item_schema, and there is no editor.
+ *
+ * A strict field ignores values in use, so a typo never becomes a suggestion.
+ */
+export function selectOptions(
+  field: ItemFieldDef,
+  items: Array<{ metadata?: Record<string, unknown> | null }>,
+): SelectOption[] {
+  const seeded = field.options ?? [];
+  const out: SelectOption[] = seeded.map((value) => ({ value, label: value, seeded: true }));
+  if (field.strict) return out;
+
+  const seen = new Set(seeded);
+  for (const item of items) {
+    const value = item.metadata?.[field.key];
+    if (typeof value !== "string" || value === "" || seen.has(value)) continue;
+    seen.add(value);
+    out.push({ value, label: value, seeded: false });
+  }
+  return out;
+}

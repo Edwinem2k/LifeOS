@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateMetadata, type ItemFieldDef } from "./list-schema";
+import { selectOptions } from "./list-schema";
 
 const BOOKS: ItemFieldDef[] = [
   { key: "author", label: "Author", type: "text" },
@@ -55,5 +56,40 @@ describe("validateMetadata", () => {
 
   it("accepts empty metadata against an empty schema", () => {
     expect(validateMetadata({}, [])).toEqual({ ok: true });
+  });
+});
+
+describe("selectOptions", () => {
+  const field: ItemFieldDef = { key: "buy_from", type: "select", options: ["Amazon.es", "Worten"] };
+  const items = [
+    { metadata: { buy_from: "Decathlon" } },
+    { metadata: { buy_from: "Amazon.es" } },
+    { metadata: { buy_from: "Leroy Merlin" } },
+    { metadata: {} },
+  ];
+
+  it("puts seeded options first, then values already in use", () => {
+    expect(selectOptions(field, items)).toEqual([
+      { value: "Amazon.es", label: "Amazon.es", seeded: true },
+      { value: "Worten", label: "Worten", seeded: true },
+      { value: "Decathlon", label: "Decathlon", seeded: false },
+      { value: "Leroy Merlin", label: "Leroy Merlin", seeded: false },
+    ]);
+  });
+
+  it("never lists a value twice", () => {
+    const values = selectOptions(field, items).map((o) => o.value);
+    expect(new Set(values).size).toBe(values.length);
+  });
+
+  it("returns only the seeded options for a strict field, ignoring stray values", () => {
+    const strict: ItemFieldDef = { key: "format", type: "select", strict: true, options: ["Film", "Series"] };
+    const stray = [{ metadata: { format: "Fim" } }];
+    expect(selectOptions(strict, stray).map((o) => o.value)).toEqual(["Film", "Series"]);
+  });
+
+  it("ignores non-string values in use", () => {
+    expect(selectOptions(field, [{ metadata: { buy_from: 42 } }]).map((o) => o.value))
+      .toEqual(["Amazon.es", "Worten"]);
   });
 });
