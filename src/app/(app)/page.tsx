@@ -28,11 +28,9 @@ export default function TodayPage() {
 
   const tasks = agenda?.filter((item: any) => item.item_type === "task") ?? [];
   // `today_agenda` emits every active habit and delegates the schedule filter
-  // to the client (002_views.sql:416). Not memoized deliberately: `habits`
-  // gets a fresh array every render regardless (no useMemo on this page), and
-  // pinning `today` to mount via useMemo(() => new Date(), []) would actively
-  // introduce a bug — a tab left open overnight would refetch on focus
-  // (staleTime 30s + refetchOnWindowFocus) but keep showing Monday's habits.
+  // to the client (002_views.sql:416). `today` is deliberately not memoized:
+  // pinning it to mount would keep a tab left open overnight showing Monday's
+  // habits, since it refetches on focus (staleTime 30s + refetchOnWindowFocus).
   const today = new Date();
   const habits =
     agenda?.filter(
