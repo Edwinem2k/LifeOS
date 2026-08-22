@@ -153,6 +153,10 @@ export function toFieldConfigs(
           type: "select",
           inline: true,
           options: selectOptions(def, items).map(({ value, label }) => ({ value, label })),
+          // An open select is where "type it once and it is a suggestion forever"
+          // actually happens for a human. A strict select stays closed on purpose:
+          // that is what stops a typo becoming a permanent suggestion.
+          ...(def.strict === true ? {} : { searchable: true, creatable: true }),
         };
       case "text":
       case "url":

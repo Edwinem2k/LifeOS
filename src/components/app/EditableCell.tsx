@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { toast } from "@/components/app/Toast";
 import { StatusPill } from "@/components/app/StatusPill";
 import { DatePicker } from "@/components/app/DatePicker";
-import { Search } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 
 type Props = {
   value: string;
@@ -17,6 +17,12 @@ type Props = {
   className?: string;
   showEmptyBox?: boolean;
   searchable?: boolean;
+  /**
+   * Lets the user commit a value that is not in `options` by typing it into the
+   * search box. Implies `searchable` — there is nowhere to type without it.
+   * Defaults to false, so every existing call site is unaffected.
+   */
+  creatable?: boolean;
   autoFocus?: boolean;
 };
 
@@ -31,6 +37,7 @@ export function EditableCell({
   className = "",
   showEmptyBox = false,
   searchable = false,
+  creatable = false,
   autoFocus = false,
 }: Props) {
   const [editing, setEditing] = useState(autoFocus);
@@ -64,11 +71,14 @@ export function EditableCell({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [dropdownOpen]);
 
+  // A creatable select needs somewhere to type, so it forces the search input on.
+  const showSearch = searchable || creatable;
+
   useEffect(() => {
-    if (dropdownOpen && searchable && searchInputRef.current) {
+    if (dropdownOpen && showSearch && searchInputRef.current) {
       searchInputRef.current.focus();
     }
-  }, [dropdownOpen, searchable]);
+  }, [dropdownOpen, showSearch]);
 
   const filteredOptions = useMemo(() => {
     if (!options) return [];
@@ -92,8 +102,33 @@ export function EditableCell({
     }
   }
 
+  /**
+   * The one save path for the select dropdown — used by both an option click and
+   * the "Add ..." row, so a created value saves exactly like a chosen one.
+   */
+  function commit(nextValue: string) {
+    setDropdownOpen(false);
+    setSearchQuery("");
+    if (nextValue === current) return;
+    setCurrent(nextValue);
+    setSaving(true);
+    onSave(nextValue)
+      .then(() => toast("Saved", "success"))
+      .catch(() => {
+        setCurrent(value);
+        toast("Error saving", "error");
+      })
+      .finally(() => setSaving(false));
+  }
+
   // SELECT: single click opens custom dropdown with colored options
   if (type === "select" && options) {
+    const createQuery = searchQuery.trim();
+    const showCreateRow =
+      creatable &&
+      createQuery !== "" &&
+      !options.some((o) => o.label.toLowerCase() === createQuery.toLowerCase());
+
     return (
       <div ref={dropdownRef} className={`relative ${className}`}>
         <div
@@ -118,7 +153,7 @@ export function EditableCell({
         </div>
         {dropdownOpen && (
           <div className="absolute top-full left-0 mt-1 bg-elevated border border-border-default rounded-md shadow-lg z-50 min-w-[160px] py-1">
-            {searchable && (
+            {showSearch && (
               <div className="px-2 pb-1 pt-0.5">
                 <div className="flex items-center gap-1.5 border border-border-default rounded-sm px-2 py-1 bg-card">
                   <Search size={12} className="text-text-muted shrink-0" />
@@ -130,6 +165,13 @@ export function EditableCell({
                     placeholder="Search..."
                     className="bg-transparent text-xs text-text-primary placeholder:text-text-muted outline-none w-full"
                     onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && showCreateRow) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        commit(createQuery);
+                      }
+                    }}
                   />
                 </div>
               </div>
@@ -139,19 +181,7 @@ export function EditableCell({
                 key={opt.value}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setDropdownOpen(false);
-                  setSearchQuery("");
-                  if (opt.value !== current) {
-                    setCurrent(opt.value);
-                    setSaving(true);
-                    onSave(opt.value)
-                      .then(() => toast("Saved", "success"))
-                      .catch(() => {
-                        setCurrent(value);
-                        toast("Error saving", "error");
-                      })
-                      .finally(() => setSaving(false));
-                  }
+                  commit(opt.value);
                 }}
                 className={`w-full text-left px-3 py-1.5 hover:bg-card flex items-center gap-2 ${
                   current === opt.value ? "bg-card" : ""
@@ -164,7 +194,19 @@ export function EditableCell({
                 )}
               </button>
             ))}
-            {searchable && filteredOptions.length === 0 && (
+            {showCreateRow && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  commit(createQuery);
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-card flex items-center gap-2"
+              >
+                <Plus size={12} className="text-text-muted shrink-0" />
+                <span className="text-xs">Add &ldquo;{createQuery}&rdquo;</span>
+              </button>
+            )}
+            {showSearch && filteredOptions.length === 0 && !showCreateRow && (
               <div className="px-3 py-2 text-xs text-text-muted">No results</div>
             )}
           </div>

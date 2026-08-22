@@ -14,6 +14,8 @@ export type FieldConfig = {
   displayAs?: "pill";
   pillType?: "status" | "area" | "priority";
   searchable?: boolean;
+  /** Select only: lets the user commit a value not already in `options`. */
+  creatable?: boolean;
   inline?: boolean;
   row?: number;
 };
@@ -111,6 +113,7 @@ export function FlyoutPanel({ title, titleField = "name", fields, data, stats, o
                             pillType={field.pillType}
                             placeholder="None"
                             searchable={field.searchable}
+                            creatable={field.creatable}
                           />
                         )}
                       </div>
@@ -170,6 +173,7 @@ export function FlyoutPanel({ title, titleField = "name", fields, data, stats, o
                         placeholder={field.placeholder ?? "\u2014"}
                         showEmptyBox={field.type === "textarea" || field.type === "text"}
                         searchable={field.searchable}
+                        creatable={field.creatable}
                       />
                     </div>
                   );

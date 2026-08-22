@@ -160,6 +160,27 @@ describe("toFieldConfigs", () => {
   });
 });
 
+describe("toFieldConfigs — creatable selects", () => {
+  it("makes an open select searchable and creatable", () => {
+    const [config] = toFieldConfigs([{ key: "buy_from", label: "Buy from", type: "select" }], []);
+    expect(config).toMatchObject({ type: "select", searchable: true, creatable: true });
+  });
+
+  it("leaves a strict select closed", () => {
+    const [config] = toFieldConfigs(
+      [{ key: "format", label: "Format", type: "select", strict: true, options: ["Film", "Series"] }],
+      [],
+    );
+    expect(config.creatable).toBeUndefined();
+    expect(config.searchable).toBeUndefined();
+  });
+
+  it("does not make a boolean select creatable", () => {
+    const [config] = toFieldConfigs([{ key: "signed", label: "Signed", type: "boolean" }], []);
+    expect(config.creatable).toBeUndefined();
+  });
+});
+
 describe("flattenItem", () => {
   it("lifts metadata to the top level alongside core fields", () => {
     const flat = flattenItem({ id: "1", title: "Chip War", notes: "n", metadata: { author: "Miller" } });
