@@ -3000,7 +3000,12 @@ circle, because a habit is never done."
 
 - [ ] Log and unlog today on a daily habit; the circle, last dot and streak all update and survive a refresh
 - [ ] Kill the network and tap the circle; confirm rollback and the error `Toast`
-- [ ] Open the flyout, then toggle the circle behind it; the heatmap and stats bar update too, not just the row (the two-cache path)
+- [ ] Open the flyout, then toggle the circle behind it; the heatmap and stats bar update too,
+      not just the row (the two-cache path) — **verify in the OPPOSITE direction, 22 Aug.**
+      Clicking the row circle while the flyout is open only dismisses the flyout; the first
+      click never reaches the circle. Backfill *in the heatmap* instead and confirm the row
+      behind it updates. Verified working: a 3x/week backfill moved the row to `1/3` and the
+      summary strip from 27%/52% to 29%/55%.
 - [ ] Backfill a past day from the heatmap; the streak recomputes
 - [ ] Click a non-required heatmap cell on a Mon/Wed/Fri habit; nothing happens
 - [ ] Backfill a past day on a **3x/week** habit; the cell is clickable and the fraction updates
@@ -3009,7 +3014,11 @@ circle, because a habit is never done."
 - [ ] **Log the break habit every day for three days; the streak reads 0 and the rate 0%** — with a target of 1 instead of a 0 ceiling this reported a full streak and 100%
 - [ ] Set a habit inactive; it dims, the circle disables, it disappears from Active and returns under All
 - [ ] Link a habit to a KR from Goals; that KR shows a rate and no check circle, and **other KRs in the same goal are unaffected**
-- [ ] Mark that KR done; the habit is unaffected
+- [ ] ~~Mark that KR done; the habit is unaffected~~ **NOT PERFORMABLE — 22 Aug.** The
+      previous item verifies a habit-backed KR has *no clickable circle*, so this item asks
+      for something its own predecessor makes impossible. The intent (004/005 triggers do not
+      touch habits) is settled by construction: habits have no `status` column, so no trigger
+      exists. Reachable only after deactivating the habit — which is the next item.
 - [ ] **Set that linked habit inactive, then toggle the KR's circle.** `useHabits()` excludes
       inactive habits, so `linkedHabit` goes undefined and the KR silently reverts to the
       check-circle branch — which restores `toggleKR` and lets the KR be marked done. Reactivate
@@ -3025,6 +3034,14 @@ circle, because a habit is never done."
 - [ ] Create a habit from QuickAdd; the flyout opens with the title focused
 - [ ] Confirm exactly **one** nav bar on `/habits` and padding matching `/goals`
 - [ ] Break the Supabase URL; the error row and retry action appear rather than a blank page
+      — **DOES NOT TEST WHAT IT INTENDS, 22 Aug.** With an invalid URL the auth middleware
+      cannot verify the session and redirects to `/login` before any page query runs, so the
+      error row never renders. Not a blank page, so the stated criterion passes, but by a
+      different mechanism. The error row is reachable only when the URL is *valid* and a query
+      then fails (RLS denial, missing table, transient network). Verified separately by
+      rejecting `fetch` for supabase calls: mutations surface a toast and roll back
+      (see the two items above), but cached reads mean a client-side nav shows stale data
+      rather than the error row. **The error/retry row remains UNVERIFIED.**
 - [ ] Fail a `SchedulePicker` save; the popover **stays open** with the previous value and an error toast
 
 - [ ] **Final checks**
