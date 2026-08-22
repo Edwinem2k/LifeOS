@@ -56,8 +56,12 @@ export function EditableCell({
   useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus();
+      // autoFocus is only ever set on a row that was just created, whose value is a
+      // placeholder like "New item". Selecting it means the first keystroke replaces
+      // the placeholder instead of appending to it.
+      if (autoFocus) inputRef.current.select();
     }
-  }, [editing]);
+  }, [editing, autoFocus]);
 
   useEffect(() => {
     if (!dropdownOpen) return;

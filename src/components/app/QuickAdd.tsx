@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, forwardRef } from "react";
+import { useState, useRef, useImperativeHandle, forwardRef } from "react";
 import { Plus } from "lucide-react";
 
 type Props = {
@@ -12,6 +12,11 @@ type Props = {
 export const QuickAdd = forwardRef<HTMLInputElement, Props>(
   function QuickAdd({ onAdd, onPlusClick, placeholder = "Add task..." }, ref) {
     const [value, setValue] = useState("");
+    // The row reads as one control, so clicking anywhere on it focuses the input.
+    // That needs the element even when the caller passed no ref, hence an internal
+    // one republished through the forwarded ref rather than the forwarded ref alone.
+    const inputRef = useRef<HTMLInputElement>(null);
+    useImperativeHandle(ref, () => inputRef.current as HTMLInputElement, []);
 
     function handleSubmit() {
       const trimmed = value.trim();
@@ -21,16 +26,21 @@ export const QuickAdd = forwardRef<HTMLInputElement, Props>(
     }
 
     return (
-      <div className="flex items-center gap-2 border-t border-dashed border-border-default px-3 py-2 bg-page">
+      <div
+        onClick={() => inputRef.current?.focus()}
+        className="flex items-center gap-2 border-t border-dashed border-border-default px-3 py-2 bg-page cursor-text"
+      >
         <button
           type="button"
-          onClick={onPlusClick}
+          // Stops the row handler from pulling focus back off the flyout that
+          // onPlusClick opens.
+          onClick={(e) => { e.stopPropagation(); onPlusClick?.(); }}
           className="shrink-0 text-text-muted hover:text-accent-primary transition-colors cursor-pointer"
         >
           <Plus size={16} />
         </button>
         <input
-          ref={ref}
+          ref={inputRef}
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
