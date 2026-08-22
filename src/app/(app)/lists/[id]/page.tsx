@@ -2,14 +2,16 @@
 
 import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ExternalLink } from "lucide-react";
-import { useList, useListItems, useCreateListItem, useUpdateListItem, useArchiveList } from "@/hooks/use-lists";
+import { Check, ExternalLink, Plus } from "lucide-react";
+import { useList, useListItems, useCreateListItem, useUpdateListItem, useUpdateList, useArchiveList } from "@/hooks/use-lists";
 import { DataTable, type Column } from "@/components/app/DataTable";
+import { EditableCell } from "@/components/app/EditableCell";
 import { FilterBar, FilterPill } from "@/components/app/FilterBar";
 import { ListIcon } from "@/components/app/ListIcon";
 import { ListItemFlyout } from "@/components/app/ListItemFlyout";
 import { QuickAdd } from "@/components/app/QuickAdd";
 import { StatusPill } from "@/components/app/StatusPill";
+import { toast } from "@/components/app/Toast";
 import { formatLabel } from "@/lib/constants";
 import type { ItemFieldDef } from "@/lib/list-schema";
 import type { ListItem } from "@/services/lists";
@@ -19,16 +21,21 @@ const ITEM_STATUSES = [
   { value: "done", label: "Done" },
 ];
 
+/** The placeholder a blank item is created with, and the flag for autofocusing it. */
+const NEW_ITEM_TITLE = "New item";
+
 /** Struck through and dimmed, so a ticked row reads as finished at a glance. */
 function doneClass(item: ListItem): string {
   return item.status === "done" ? "line-through text-text-muted" : "";
 }
 
-function ItemCheckbox({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+function ItemCheckbox({ checked, onChange, className = "" }: {
+  checked: boolean; onChange: () => void; className?: string;
+}) {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onChange(); }}
-      className={`group w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+      className={`group w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all cursor-pointer ${className} ${
         checked
           ? "bg-accent-primary border-accent-primary"
           : "border-text-muted/40 hover:border-accent-primary"
@@ -98,6 +105,7 @@ export default function ListDetailPage({ params }: { params: Promise<{ id: strin
   const { data: items } = useListItems(id);
   const createItem = useCreateListItem(id);
   const updateItem = useUpdateListItem(id);
+  const updateList = useUpdateList();
   const archiveList = useArchiveList();
 
   const schema = useMemo<ItemFieldDef[]>(() => list?.item_schema ?? [], [list]);
@@ -134,20 +142,33 @@ export default function ListDetailPage({ params }: { params: Promise<{ id: strin
       {
         key: "title",
         header: "Item",
-        width: "320px",
-        render: (row) => (
-          <span className="inline-flex items-center gap-2 max-w-full">
-            <ItemCheckbox
-              checked={row.status === "done"}
-              onChange={() => updateItem.mutate({
-                id: row.id,
-                data: { status: row.status === "done" ? "open" : "done" },
-                schema,
-              })}
-            />
-            <span className={`truncate ${doneClass(row)}`}>{row.title}</span>
-          </span>
-        ),
+        // Wider than the other pages' first column because it now carries two lines.
+        width: "360px",
+        render: (row) => {
+          const notes = typeof row.notes === "string" ? row.notes.trim() : "";
+          return (
+            // items-start, not items-center: with a notes line present the checkbox
+            // should sit on the title, not float between the two lines. The row is a
+            // fixed h-10, so the second line never changes the row height either way.
+            <span className="flex items-start gap-2 min-w-0">
+              <ItemCheckbox
+                className="mt-0.5"
+                checked={row.status === "done"}
+                onChange={() => updateItem.mutate({
+                  id: row.id,
+                  data: { status: row.status === "done" ? "open" : "done" },
+                  schema,
+                })}
+              />
+              <span className="min-w-0 flex-1">
+                <span className={`block truncate ${doneClass(row)}`}>{row.title}</span>
+                {notes !== "" && (
+                  <span className="block truncate text-xs text-text-secondary">{notes}</span>
+                )}
+              </span>
+            </span>
+          );
+        },
       },
     ];
 
@@ -186,6 +207,28 @@ export default function ListDetailPage({ params }: { params: Promise<{ id: strin
     return cols;
   }, [tableFields, urlField, schema, updateItem]);
 
+  // Declared after the memos above: a hoisted function reading `schema` before its
+  // useMemo stops the React Compiler preserving that memoization.
+  /** Create a blank item and open it, with its placeholder title selected. */
+  function createAndOpen() {
+    createItem.mutate(
+      { title: NEW_ITEM_TITLE, schema, metadata: {} },
+      { onSuccess: (created) => setSelectedId(created.id) }
+    );
+  }
+
+  async function saveName(next: string) {
+    const name = next.trim();
+    if (name === "") {
+      // Rejecting is the only way to refuse a value: EditableCell keeps whatever it
+      // was given unless onSave throws, and its own generic "Error saving" toast
+      // fires as soon as this settles, so the real reason has to queue behind it.
+      setTimeout(() => toast("A list needs a name", "error"), 0);
+      throw new Error("A list needs a name");
+    }
+    await updateList.mutateAsync({ id, data: { name } });
+  }
+
   const selected = allItems.find((i) => i.id === selectedId) ?? null;
 
   if (!list || !items) {
@@ -198,20 +241,37 @@ export default function ListDetailPage({ params }: { params: Promise<{ id: strin
         <div className="min-w-0">
           <div className="flex items-center gap-2 min-w-0">
             <ListIcon name={list.icon} size={20} className="shrink-0 text-text-secondary" />
-            <h1 className="text-2xl font-semibold truncate">{list.name}</h1>
+            {/* Inline-editable, because an ad-hoc list is born as "Untitled list" and
+                there is nowhere else in the app to rename it. */}
+            <EditableCell
+              value={list.name}
+              onSave={saveName}
+              className="text-2xl font-semibold min-w-0 truncate"
+            />
           </div>
           <p className="text-xs text-text-secondary tabular-nums mt-1">
             {counts.open} open · {counts.done} done
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => archiveList.mutate(id, { onSuccess: () => router.push("/lists") })}
-          disabled={archiveList.isPending}
-          className="shrink-0 px-3 py-1.5 text-sm font-medium text-text-secondary border border-border-default rounded-sm transition-colors hover:text-accent-danger hover:border-accent-danger disabled:opacity-60"
-        >
-          Archive list
-        </button>
+        <div className="shrink-0 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={createAndOpen}
+            disabled={createItem.isPending}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-accent-primary border border-accent-primary rounded-sm hover:bg-accent-primary/10 transition-colors disabled:opacity-60"
+          >
+            <Plus size={14} />
+            New item
+          </button>
+          <button
+            type="button"
+            onClick={() => archiveList.mutate(id, { onSuccess: () => router.push("/lists") })}
+            disabled={archiveList.isPending}
+            className="shrink-0 px-3 py-1.5 text-sm font-medium text-text-secondary border border-border-default rounded-sm transition-colors hover:text-accent-danger hover:border-accent-danger disabled:opacity-60"
+          >
+            Archive list
+          </button>
+        </div>
       </div>
 
       <FilterBar>
@@ -245,12 +305,7 @@ export default function ListDetailPage({ params }: { params: Promise<{ id: strin
       <QuickAdd
         placeholder="Add item..."
         onAdd={(title) => createItem.mutate({ title, schema, metadata: {} })}
-        onPlusClick={() => {
-          createItem.mutate(
-            { title: "New item", schema, metadata: {} },
-            { onSuccess: (created) => setSelectedId(created.id) }
-          );
-        }}
+        onPlusClick={createAndOpen}
       />
 
       {selected && (
@@ -262,6 +317,7 @@ export default function ListDetailPage({ params }: { params: Promise<{ id: strin
             await updateItem.mutateAsync({ id: selected.id, data, schema });
           }}
           onClose={() => setSelectedId(null)}
+          autoFocusTitle={selected.title === NEW_ITEM_TITLE}
         />
       )}
     </div>

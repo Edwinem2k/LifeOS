@@ -12,6 +12,8 @@ type Props = {
   items: ListItem[];
   onSave: (data: Partial<ListItem>) => Promise<void>;
   onClose: () => void;
+  /** Set on a freshly created item so its placeholder title is selected, not appended to. */
+  autoFocusTitle?: boolean;
 };
 
 /**
@@ -28,7 +30,7 @@ function reportAndThrow(message: string): never {
  * FlyoutPanel over a list item. Its whole job is the translation in `handleSave`:
  * the panel deals only in strings, but item metadata is typed jsonb.
  */
-export function ListItemFlyout({ item, schema, items, onSave, onClose }: Props) {
+export function ListItemFlyout({ item, schema, items, onSave, onClose, autoFocusTitle = false }: Props) {
   const data = flattenItem(item);
 
   const base: FieldConfig[] = [
@@ -105,6 +107,7 @@ export function ListItemFlyout({ item, schema, items, onSave, onClose }: Props) 
       data={data}
       onSave={handleSave}
       onClose={onClose}
+      autoFocusTitle={autoFocusTitle}
     />
   );
 }
