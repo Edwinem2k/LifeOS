@@ -115,3 +115,79 @@ export function selectOptions(
   }
   return out;
 }
+
+import type { FieldConfig } from "@/components/app/FlyoutPanel";
+
+/**
+ * Translates item_schema field definitions into FlyoutPanel's FieldConfig.
+ *
+ * FlyoutPanel has no url or boolean type, so url renders as text and boolean as a
+ * yes/no select. Multiline text becomes a textarea and drops out of the inline
+ * metadata row, so summaries render as a paragraph block.
+ */
+export function toFieldConfigs(
+  schema: ItemFieldDef[],
+  items: Array<{ metadata?: Record<string, unknown> | null }>,
+): FieldConfig[] {
+  return schema.map((def) => {
+    const base = { key: def.key, label: def.label ?? def.key, placeholder: def.description };
+
+    switch (def.type) {
+      case "number":
+        return { ...base, type: "number", inline: true };
+      case "date":
+        return { ...base, type: "date", inline: true };
+      case "boolean":
+        return {
+          ...base,
+          type: "select",
+          inline: true,
+          options: [
+            { value: "true", label: "Yes" },
+            { value: "false", label: "No" },
+          ],
+        };
+      case "select":
+        return {
+          ...base,
+          type: "select",
+          inline: true,
+          options: selectOptions(def, items).map(({ value, label }) => ({ value, label })),
+        };
+      case "text":
+      case "url":
+      default:
+        return def.multiline
+          ? { ...base, type: "textarea" }
+          : { ...base, type: "text", inline: true };
+    }
+  });
+}
+
+/** Core columns win over metadata keys — a metadata `title` must not shadow the real one. */
+export function flattenItem(item: {
+  metadata?: Record<string, unknown> | null;
+  [key: string]: unknown;
+}): Record<string, any> {
+  const { metadata, ...core } = item;
+  return { ...(metadata ?? {}), ...core };
+}
+
+/** FlyoutPanel always hands back a string. Put it back in the shape the schema wants. */
+export function coerceValue(raw: string, def: ItemFieldDef): unknown {
+  if (raw === "") return null;
+
+  switch (def.type) {
+    case "number": {
+      const parsed = Number(raw);
+      if (Number.isNaN(parsed)) {
+        throw new Error(`${def.label ?? def.key} must be a number`);
+      }
+      return parsed;
+    }
+    case "boolean":
+      return raw === "true";
+    default:
+      return raw;
+  }
+}
