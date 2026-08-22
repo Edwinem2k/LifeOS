@@ -58,6 +58,28 @@ describe("validateMetadata", () => {
   it("accepts empty metadata against an empty schema", () => {
     expect(validateMetadata({}, [])).toEqual({ ok: true });
   });
+
+  it("accepts a boolean field given true or false", () => {
+    const schema: ItemFieldDef[] = [{ key: "signed", label: "Signed", type: "boolean" }];
+    expect(validateMetadata({ signed: true }, schema)).toEqual({ ok: true });
+    expect(validateMetadata({ signed: false }, schema)).toEqual({ ok: true });
+  });
+
+  it("rejects a boolean field given a string", () => {
+    const schema: ItemFieldDef[] = [{ key: "signed", label: "Signed", type: "boolean" }];
+    const result = validateMetadata({ signed: "yes" }, schema);
+    expect(result.ok === false && result.message).toBe("Signed must be true or false");
+  });
+
+  it("accepts a date field given an ISO date string", () => {
+    const schema: ItemFieldDef[] = [{ key: "published", label: "Published", type: "date" }];
+    expect(validateMetadata({ published: "2026-08-22" }, schema)).toEqual({ ok: true });
+  });
+
+  it("rejects a date field given a number", () => {
+    const schema: ItemFieldDef[] = [{ key: "published", label: "Published", type: "date" }];
+    expect(validateMetadata({ published: 20260822 }, schema).ok).toBe(false);
+  });
 });
 
 describe("selectOptions", () => {
@@ -175,5 +197,7 @@ describe("coerceValue", () => {
 
   it("leaves text, select and url as strings", () => {
     expect(coerceValue("Deutsch", { key: "author", type: "text" })).toBe("Deutsch");
+    expect(coerceValue("Cli-fi", { key: "genre", type: "select" })).toBe("Cli-fi");
+    expect(coerceValue("https://example.com", { key: "url", type: "url" })).toBe("https://example.com");
   });
 });

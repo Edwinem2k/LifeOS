@@ -1,3 +1,5 @@
+import type { FieldConfig } from "@/components/app/FlyoutPanel";
+
 /**
  * The single source of truth for the list item_schema vocabulary.
  *
@@ -115,8 +117,6 @@ export function selectOptions(
   }
   return out;
 }
-
-import type { FieldConfig } from "@/components/app/FlyoutPanel";
 
 /**
  * Translates item_schema field definitions into FlyoutPanel's FieldConfig.
