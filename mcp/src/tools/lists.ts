@@ -158,12 +158,29 @@ export async function handleCreateListItem(params: {
   }
 
   const client = getClient();
+
+  // New items land at the bottom, matching how the web app orders tasks and
+  // projects. Without this the MCP inserts a null sort_order and agent-added
+  // items interleave unpredictably with UI-added ones.
+  const { data: last } = await client
+    .from('list_items')
+    .select('sort_order')
+    .eq('user_id', USER_ID)
+    .eq('list_id', resolved.row.id)
+    .is('archived_at', null)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  const lastRows = (last ?? []) as Array<{ sort_order: number | null }>;
+  const maxOrder = lastRows.length > 0 ? (lastRows[0].sort_order ?? 0) : 0;
+
   const row: Record<string, unknown> = {
     user_id: USER_ID,
     list_id: resolved.row.id,
     title: params.title,
     status: params.status ?? 'open',
     metadata,
+    sort_order: maxOrder + 1,
   };
 
   const { data, error } = await client.from('list_items').insert(row).select().single();
@@ -184,55 +201,10 @@ export async function handleUpdateListItem(params: {
   const client = getClient();
 
   // identifier is used for lookup only — never written to the DB
-  let before: Record<string, any>;
-  let listRow: Record<string, any> | null = null;
-
-  if (isUuid(params.identifier)) {
-    const resolved = await resolveEntity('list_items', 'title', params.identifier);
-    if (!resolved.ok) return resolved;
-    before = resolved.row;
-  } else {
-    // Titles repeat across lists, so a title lookup needs the owning list.
-    if (!params.list) {
-      return {
-        ok: false as const,
-        error: 'validation_error' as const,
-        message: `A list is required to find the item "${params.identifier}" by title. Pass "list", or pass the item's UUID as the identifier.`,
-      };
-    }
-
-    const listResolved = await resolveEntity('lists', 'name', params.list);
-    if (!listResolved.ok) return listResolved;
-    listRow = listResolved.row;
-
-    const { data, error } = await client
-      .from('list_items')
-      .select('*')
-      .eq('user_id', USER_ID)
-      .eq('list_id', listRow!.id)
-      .ilike('title', `%${params.identifier}%`)
-      .is('archived_at', null);
-
-    if (error) return { ok: false as const, error: 'db_error' as const, message: error.message };
-
-    const matches = (data ?? []) as Array<Record<string, any>>;
-    if (matches.length === 0) {
-      return {
-        ok: false as const,
-        error: 'not_found' as const,
-        message: `No list items found matching "${params.identifier}" in list "${listRow!.name}".`,
-      };
-    }
-    if (matches.length > 1) {
-      return {
-        ok: false as const,
-        error: 'ambiguous' as const,
-        message: `Multiple list items match "${params.identifier}" in list "${listRow!.name}". Please be more specific.`,
-        candidates: matches.map((row) => ({ id: row.id, title: row.title })),
-      };
-    }
-    before = matches[0];
-  }
+  const resolved = await resolveListItem(params);
+  if (!resolved.ok) return resolved;
+  const before: Record<string, any> = resolved.row;
+  let listRow: Record<string, any> | null = resolved.listRow;
 
   const patch: Record<string, unknown> = {};
   if (params.title !== undefined) patch.title = params.title;
@@ -287,6 +259,153 @@ export async function handleUpdateListItem(params: {
   if (error) return { ok: false as const, error: 'db_error' as const, message: error.message };
   await audit('update', 'list_items', data.id, { before, after: data });
   return { ok: true as const, before, after: data };
+}
+
+type ResolveItemResult =
+  | { ok: true; row: Record<string, any>; listRow: Record<string, any> | null }
+  | {
+      ok: false;
+      error: string;
+      message: string;
+      candidates?: Array<{ id: string; title: string }>;
+    };
+
+/**
+ * Finds one list item by UUID, or by a title search scoped to its owning list.
+ * Titles repeat across lists, so a title lookup with no list is ambiguous by
+ * construction and is refused rather than guessed at.
+ */
+export async function resolveListItem(params: {
+  identifier: string;
+  list?: string;
+}): Promise<ResolveItemResult> {
+  if (isUuid(params.identifier)) {
+    const resolved = await resolveEntity('list_items', 'title', params.identifier);
+    if (!resolved.ok) return resolved as unknown as ResolveItemResult;
+    return { ok: true, row: resolved.row, listRow: null };
+  }
+
+  if (!params.list) {
+    return {
+      ok: false,
+      error: 'validation_error',
+      message: `A list is required to find the item "${params.identifier}" by title. Pass "list", or pass the item's UUID as the identifier.`,
+    };
+  }
+
+  const listResolved = await resolveEntity('lists', 'name', params.list);
+  if (!listResolved.ok) return listResolved as unknown as ResolveItemResult;
+
+  const client = getClient();
+  const { data, error } = await client
+    .from('list_items')
+    .select('*')
+    .eq('user_id', USER_ID)
+    .eq('list_id', listResolved.row.id)
+    .ilike('title', `%${params.identifier}%`)
+    .is('archived_at', null);
+
+  if (error) return { ok: false, error: 'db_error', message: error.message };
+
+  const matches = (data ?? []) as Array<Record<string, any>>;
+  if (matches.length === 0) {
+    return {
+      ok: false,
+      error: 'not_found',
+      message: `No list items found matching "${params.identifier}" in list "${listResolved.row.name}".`,
+    };
+  }
+  if (matches.length > 1) {
+    return {
+      ok: false,
+      error: 'ambiguous',
+      message: `Multiple list items match "${params.identifier}" in list "${listResolved.row.name}". Please be more specific.`,
+      candidates: matches.map((row) => ({ id: row.id, title: row.title })),
+    };
+  }
+  return { ok: true, row: matches[0], listRow: listResolved.row };
+}
+
+export async function handleUpdateList(params: {
+  identifier: string;
+  name?: string;
+  description?: string;
+  notes?: string;
+  icon?: string;
+  pinned?: boolean;
+  pin_order?: number;
+  item_schema?: ItemFieldDef[];
+}) {
+  const patch: Record<string, unknown> = {};
+  if (params.name !== undefined) patch.name = params.name;
+  if (params.description !== undefined) patch.description = params.description;
+  if (params.notes !== undefined) patch.notes = params.notes;
+  if (params.icon !== undefined) patch.icon = params.icon;
+  if (params.pinned !== undefined) patch.pinned = params.pinned;
+  if (params.pin_order !== undefined) patch.pin_order = params.pin_order;
+  if (params.item_schema !== undefined) patch.item_schema = params.item_schema;
+
+  if (Object.keys(patch).length === 0) {
+    return {
+      ok: false as const,
+      error: 'validation_error' as const,
+      message: 'No fields to update.',
+    };
+  }
+
+  const resolved = await resolveEntity('lists', 'name', params.identifier);
+  if (!resolved.ok) return resolved;
+
+  const client = getClient();
+  const { data, error } = await client
+    .from('lists')
+    .update(patch)
+    .eq('id', resolved.row.id)
+    .eq('user_id', USER_ID)
+    .select()
+    .single();
+
+  if (error) return { ok: false as const, error: 'db_error' as const, message: error.message };
+  await audit('update', 'lists', data.id, { before: resolved.row, after: data });
+  return { ok: true as const, before: resolved.row, after: data };
+}
+
+export async function handleArchiveList(params: { identifier: string }) {
+  const resolved = await resolveEntity('lists', 'name', params.identifier);
+  if (!resolved.ok) return resolved;
+
+  const client = getClient();
+  const { error } = await client
+    .from('lists')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', resolved.row.id)
+    .eq('user_id', USER_ID)
+    .is('archived_at', null);
+
+  if (error) return { ok: false as const, error: 'db_error' as const, message: error.message };
+  await audit('delete', 'lists', resolved.row.id as string, { before: resolved.row });
+  return {
+    ok: true as const,
+    message: `List "${resolved.row.name}" archived. Its items are archived with it.`,
+  };
+}
+
+export async function handleDeleteListItem(params: { identifier: string; list?: string }) {
+  const resolved = await resolveListItem(params);
+  if (!resolved.ok) return resolved;
+
+  const before = resolved.row;
+  const client = getClient();
+  const { error } = await client
+    .from('list_items')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', before.id)
+    .eq('user_id', USER_ID)
+    .is('archived_at', null);
+
+  if (error) return { ok: false as const, error: 'db_error' as const, message: error.message };
+  await audit('delete', 'list_items', before.id as string, { before });
+  return { ok: true as const, message: `Item "${before.title}" removed.` };
 }
 
 // --- MCP Registration ---
@@ -369,5 +488,53 @@ export function registerListTools(server: McpServer) {
       sort_order: z.number().optional().describe('Manual sort order within the list'),
     },
     async (params) => asContent(await handleUpdateListItem(params)),
+  );
+  server.tool(
+    'update_list',
+    'Update a list itself (not its items): rename it, change its icon or description, pin it to the app navigation, or replace its item_schema. Pinned lists appear in the Lists nav dropdown in pin_order; everything else lives under "All lists".',
+    {
+      identifier: z.string().describe('List UUID or name to search for'),
+      name: z.string().optional().describe('New list name'),
+      description: z.string().optional().describe('What this list is for'),
+      notes: z.string().optional().describe('Freeform notes about the list'),
+      icon: z.string().optional().describe('Emoji or icon name for the list'),
+      pinned: z
+        .boolean()
+        .optional()
+        .describe('Pin this list to the nav dropdown, or unpin it'),
+      pin_order: z
+        .number()
+        .optional()
+        .describe('Position among pinned lists, low to high'),
+      item_schema: z
+        .array(itemFieldSchema)
+        .optional()
+        .describe(
+          'Replacement custom field definitions. Replaces the whole array — send every field you want to keep. Existing metadata keys dropped from the schema stay on their items but can no longer be written.',
+        ),
+    },
+    async (params) => asContent(await handleUpdateList(params)),
+  );
+
+  server.tool(
+    'archive_list',
+    'Archive a whole list (sets archived_at). Use this to file away a finished ad-hoc list — a completed shopping trip, a packing list for a trip already taken. The list and its items are hidden but not destroyed.',
+    {
+      identifier: z.string().describe('List UUID or name to search for'),
+    },
+    async (params) => asContent(await handleArchiveList(params)),
+  );
+
+  server.tool(
+    'delete_list_item',
+    'Remove one item from a list (soft-delete, sets archived_at). Identify it by UUID, or by a title search plus the list it belongs to. Use this for items added by mistake — to mark something as bought or read, use update_list_item with status "done" instead.',
+    {
+      identifier: z.string().describe('Item UUID, or a title to search for within `list`'),
+      list: z
+        .string()
+        .optional()
+        .describe('List name — required when identifier is a title rather than a UUID'),
+    },
+    async (params) => asContent(await handleDeleteListItem(params)),
   );
 }

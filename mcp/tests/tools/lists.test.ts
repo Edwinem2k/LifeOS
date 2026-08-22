@@ -31,6 +31,9 @@ import {
   handleListItems,
   handleCreateListItem,
   handleUpdateListItem,
+  handleUpdateList,
+  handleArchiveList,
+  handleDeleteListItem,
   validateMetadata,
 } from '../../src/tools/lists.js';
 
@@ -353,5 +356,114 @@ describe('lists tools', () => {
     client()._setResult({ data: null, error: { message: 'boom' } });
     const result = await handleCreateListItem({ list: 'Movies', title: 'Inception' });
     expect(result).toMatchObject({ ok: false, error: 'db_error', message: 'boom' });
+  });
+  // --- sort_order on create_list_item ---
+
+  it('create_list_item appends at max sort_order + 1', async () => {
+    const maxBuilder = createMockQueryBuilder({ data: [{ sort_order: 7 }], error: null });
+    const insertBuilder = createMockQueryBuilder({ data: [{ id: 'item-1' }], error: null });
+    client().from.mockReturnValueOnce(maxBuilder as never).mockReturnValue(insertBuilder as never);
+
+    await handleCreateListItem({ list: 'Movies', title: 'Dune' });
+
+    const inserted = (insertBuilder as Record<string, any>).insert.mock.calls[0][0];
+    expect(inserted.sort_order).toBe(8);
+  });
+
+  it('create_list_item starts an empty list at sort_order 1', async () => {
+    const maxBuilder = createMockQueryBuilder({ data: [], error: null });
+    const insertBuilder = createMockQueryBuilder({ data: [{ id: 'item-1' }], error: null });
+    client().from.mockReturnValueOnce(maxBuilder as never).mockReturnValue(insertBuilder as never);
+
+    await handleCreateListItem({ list: 'Movies', title: 'Dune' });
+
+    const inserted = (insertBuilder as Record<string, any>).insert.mock.calls[0][0];
+    expect(inserted.sort_order).toBe(1);
+  });
+
+  // --- update_list ---
+
+  it('update_list changes name, icon and pinning, and audits with before/after', async () => {
+    client()._setResult({ data: [{ id: 'list-1', name: 'Films', pinned: true }], error: null });
+
+    const result = await handleUpdateList({
+      identifier: 'Movies',
+      name: 'Films',
+      icon: 'clapperboard',
+      pinned: true,
+      pin_order: 2,
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    const patch = client()._queryBuilder.update.mock.calls[0][0];
+    expect(patch).toMatchObject({ name: 'Films', icon: 'clapperboard', pinned: true, pin_order: 2 });
+    expect(patch.identifier).toBeUndefined();
+    expect(client()._queryBuilder.eq).toHaveBeenCalledWith('user_id', 'test-user');
+    expect(audit).toHaveBeenCalledWith('update', 'lists', 'list-1', expect.anything());
+  });
+
+  it('update_list can replace item_schema', async () => {
+    client()._setResult({ data: [{ id: 'list-1' }], error: null });
+    const schema = [{ key: 'author', label: 'Author', type: 'text' }];
+
+    await handleUpdateList({ identifier: 'Books', item_schema: schema });
+
+    const patch = client()._queryBuilder.update.mock.calls[0][0];
+    expect(patch.item_schema).toEqual(schema);
+  });
+
+  it('update_list rejects a call with nothing to change', async () => {
+    const result = await handleUpdateList({ identifier: 'Movies' });
+    expect(result).toMatchObject({ ok: false, error: 'validation_error' });
+    expect(client()._queryBuilder.update).not.toHaveBeenCalled();
+  });
+
+  // --- archive_list ---
+
+  it('archive_list soft-deletes via archived_at, scoped to the user, and audits', async () => {
+    const result = await handleArchiveList({ identifier: 'Lidl — this week' });
+
+    expect(result).toMatchObject({ ok: true });
+    const patch = client()._queryBuilder.update.mock.calls[0][0];
+    expect(typeof patch.archived_at).toBe('string');
+    expect(client()._queryBuilder.eq).toHaveBeenCalledWith('user_id', 'test-user');
+    expect(client()._queryBuilder.is).toHaveBeenCalledWith('archived_at', null);
+    expect(audit).toHaveBeenCalledWith('delete', 'lists', 'list-1', expect.anything());
+  });
+
+  it('archive_list propagates a not_found from the resolver', async () => {
+    vi.mocked(resolveEntity).mockResolvedValue({
+      ok: false,
+      error: 'not_found',
+      message: 'No lists found matching "nope".',
+    } as never);
+
+    const result = await handleArchiveList({ identifier: 'nope' });
+    expect(result).toMatchObject({ ok: false, error: 'not_found' });
+    expect(client()._queryBuilder.update).not.toHaveBeenCalled();
+  });
+
+  // --- delete_list_item ---
+
+  it('delete_list_item soft-deletes the item and audits against list_items', async () => {
+    vi.mocked(resolveEntity).mockResolvedValue({
+      ok: true,
+      row: { id: 'item-3', title: 'Olive oil', list_id: 'list-1' },
+    } as never);
+
+    const result = await handleDeleteListItem({ identifier: UUID });
+
+    expect(result).toMatchObject({ ok: true });
+    const patch = client()._queryBuilder.update.mock.calls[0][0];
+    expect(typeof patch.archived_at).toBe('string');
+    expect(audit).toHaveBeenCalledWith('delete', 'list_items', 'item-3', expect.anything());
+  });
+
+  it('delete_list_item requires a list when the identifier is a title', async () => {
+    const result = await handleDeleteListItem({ identifier: 'Olive oil' });
+
+    expect(result).toMatchObject({ ok: false, error: 'validation_error' });
+    expect(result).toHaveProperty('message', expect.stringContaining('list'));
+    expect(client()._queryBuilder.update).not.toHaveBeenCalled();
   });
 });
