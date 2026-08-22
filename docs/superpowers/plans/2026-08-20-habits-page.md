@@ -2785,6 +2785,33 @@ const habits =
     .filter((item: any) => isRequiredOn(item.item_details?.schedule, today)) ?? [];
 ```
 
+**Amended after code review (commit `4e8effd` → follow-up commit):** the double-`.filter()`
+form above shipped first and passed typecheck and tests, but code review flagged two things
+worth folding into one edit before merge. First, the re-filter had no comment explaining that
+`today_agenda` deliberately delegates the schedule filter to the client (that contract lives
+only in the SQL comment at `002_views.sql:416`) — worth writing down given the missing filter
+*is* the bug this task fixes. Second, the two-callback form cost a second `(item: any) =>`
+annotation, which silently pushed this file's `no-explicit-any` lint count from 7 to 8 (see
+the Task 20 baseline table, now updated to include this file). The shipped version collapses
+to one predicate, matching the visual shape of the `tasks`/`events` derivations either side of
+it and costing zero net new lint problems:
+
+```ts
+// `today_agenda` emits every active habit and delegates the schedule filter
+// to the client (002_views.sql:416). Not memoized deliberately: `habits`
+// gets a fresh array every render regardless (no useMemo on this page), and
+// pinning `today` to mount via useMemo(() => new Date(), []) would actively
+// introduce a bug — a tab left open overnight would refetch on focus
+// (staleTime 30s + refetchOnWindowFocus) but keep showing Monday's habits.
+const today = new Date();
+const habits =
+  agenda?.filter(
+    (item: any) =>
+      item.item_type === "habit" &&
+      isRequiredOn(item.item_details?.schedule, today)
+  ) ?? [];
+```
+
 The view already emits `item_details.schedule` (line 425), so no view change is needed.
 
 **Known limitation (spec §8):** this is a no-op for per-week habits. `isRequiredOn` returns true every day for `perWeek` because any day may be used to hit the target, so a 3x/week habit already completed three times stays on Today for the rest of the week. Suppressing it would require Today to fetch the current week's logs, which `today_agenda` does not carry.
@@ -3007,17 +3034,24 @@ npm run build     # succeeds
 # ignore `mcp/`, so it lints the MCP package's compiled dist/ output. That is a
 # pre-existing condition that arrived with the MCP merge and is not this work's
 # to fix; a whole-repo gate would be meaningless here.
-npx eslint src/lib/habit-stats.ts src/lib/habit-stats.test.ts            src/services/habits.ts src/hooks/use-habits.ts            src/components/app/HabitRow.tsx src/components/app/HabitFlyout.tsx            src/components/app/HabitHeatmap.tsx src/components/app/SchedulePicker.tsx            "src/app/(app)/habits/page.tsx"
+npx eslint src/lib/habit-stats.ts src/lib/habit-stats.test.ts            src/services/habits.ts src/hooks/use-habits.ts            src/components/app/HabitRow.tsx src/components/app/HabitFlyout.tsx            src/components/app/HabitHeatmap.tsx src/components/app/SchedulePicker.tsx            "src/app/(app)/habits/page.tsx" "src/app/(app)/page.tsx"
 ```
 
-**Expected lint baseline for the scoped command: 18 problems (16 errors, 2 warnings).**
-Measured on 21 Aug with Tasks 1-17 landed — 15 `no-explicit-any`, 1 `set-state-in-effect`,
+**`src/app/(app)/page.tsx` added to the scoped command on 22 Aug.** Task 18 modifies this
+file but the command above originally didn't cover it, so Task 18 shipped with zero lint
+coverage — a code-review finding caught it after the fact (the double-`.filter()` draft had
+briefly pushed this file's `no-explicit-any` count from 7 to 8 before being collapsed to one
+predicate; see Task 18's amendment note). Recorded here rather than left as a silent gap so
+the next task doesn't reintroduce it.
+
+**Expected lint baseline for the scoped command: 25 problems (23 errors, 2 warnings).**
+Measured on 22 Aug with Tasks 1-18 landed — 22 `no-explicit-any`, 1 `set-state-in-effect`,
 2 `exhaustive-deps`. The gate's job is to catch *new* rule violations,
 not to reach zero — so compare the composition, not just the count.
 
 | Rule | Count | Why it is accepted |
 |---|---|---|
-| `@typescript-eslint/no-explicit-any` | 15 | `src/lib/types.ts` is literally `export type Database = any`, so there are no generated Supabase row types to reference. The same rule fires in `DataTable.tsx` (×4), `FlyoutPanel.tsx` and `EditableCell.tsx`. Typing these properly means generating Supabase types — a separate piece of work, now in the Deferred table. |
+| `@typescript-eslint/no-explicit-any` | 22 | `src/lib/types.ts` is literally `export type Database = any`, so there are no generated Supabase row types to reference. The same rule fires in `DataTable.tsx` (×4), `FlyoutPanel.tsx` and `EditableCell.tsx`. 7 of the 22 are in `src/app/(app)/page.tsx` alone (pre-existing, unrelated to Task 18's edit — Task 18's own edit reuses an existing `(item: any) =>` callback rather than adding one, so it contributes zero net-new). Typing these properly means generating Supabase types — a separate piece of work, now in the Deferred table. |
 | `react-hooks/set-state-in-effect` | 1 | `SchedulePicker`'s re-sync effect. `NotePopover:17` has the same, and it is the pattern this component was told to mirror. |
 | `react-hooks/exhaustive-deps` on `open` | 1 | Deliberate. Adding `open` to the deps re-runs the effect on every open/close and defeats the guard that stops a background refetch wiping an edit in progress. |
 | `react-hooks/exhaustive-deps` on `commit` | 1 | Same shape as `NotePopover:29`'s missing `handleSave`. |
