@@ -1,0 +1,59 @@
+import { describe, it, expect } from "vitest";
+import { validateMetadata, type ItemFieldDef } from "./list-schema";
+
+const BOOKS: ItemFieldDef[] = [
+  { key: "author", label: "Author", type: "text" },
+  { key: "rating", label: "Rating", type: "number" },
+  { key: "url", label: "Link", type: "url" },
+  { key: "genre", label: "Genre", type: "select" },
+  { key: "form", label: "Form", type: "select", strict: true, options: ["Fiction", "Non-fiction"] },
+];
+
+describe("validateMetadata", () => {
+  it("accepts metadata conforming to the schema", () => {
+    expect(validateMetadata({ author: "Deutsch", rating: 4.2 }, BOOKS)).toEqual({ ok: true });
+  });
+
+  it("rejects a key that is not in the schema, and names the valid keys", () => {
+    const result = validateMetadata({ publisher: "Penguin" }, BOOKS);
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.message).toContain("publisher");
+    expect(result.ok === false && result.message).toContain("author");
+  });
+
+  it("rejects a number field given a string", () => {
+    const result = validateMetadata({ rating: "4.2" }, BOOKS);
+    expect(result.ok === false && result.message).toBe("Rating must be a number");
+  });
+
+  it("treats url as a string", () => {
+    expect(validateMetadata({ url: "https://example.com" }, BOOKS)).toEqual({ ok: true });
+    expect(validateMetadata({ url: 42 }, BOOKS).ok).toBe(false);
+  });
+
+  it("accepts any string for an open select", () => {
+    expect(validateMetadata({ genre: "Cli-fi" }, BOOKS)).toEqual({ ok: true });
+  });
+
+  it("rejects a value outside the options of a strict select", () => {
+    const result = validateMetadata({ form: "Fim" }, BOOKS);
+    expect(result.ok === false && result.message).toContain("Fiction");
+  });
+
+  it("accepts a listed value for a strict select", () => {
+    expect(validateMetadata({ form: "Fiction" }, BOOKS)).toEqual({ ok: true });
+  });
+
+  it("ignores null and undefined values", () => {
+    expect(validateMetadata({ rating: null, author: undefined }, BOOKS)).toEqual({ ok: true });
+  });
+
+  it("rejects every key when the schema is empty, and says so plainly", () => {
+    const result = validateMetadata({ anything: "x" }, []);
+    expect(result.ok === false && result.message).toContain("no custom fields");
+  });
+
+  it("accepts empty metadata against an empty schema", () => {
+    expect(validateMetadata({}, [])).toEqual({ ok: true });
+  });
+});
