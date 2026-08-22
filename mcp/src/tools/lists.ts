@@ -10,6 +10,11 @@ export interface ItemFieldDef {
   key: string;
   label?: string;
   type: string;
+  strict?: boolean;
+  options?: string[];
+  multiline?: boolean;
+  table?: boolean;
+  description?: string;
 }
 
 /** Normalises a list's `item_schema` column, which may be null or malformed. */
@@ -24,7 +29,7 @@ function asSchema(raw: unknown): ItemFieldDef[] {
  */
 export function validateMetadata(
   metadata: Record<string, unknown>,
-  schema: Array<{ key: string; type: string }>,
+  schema: Array<{ key: string; type: string; strict?: boolean; options?: string[] }>,
 ): { ok: true } | { ok: false; error: 'validation_error'; message: string } {
   const validKeys = new Set(schema.map((s) => s.key));
   const unknownKeys = Object.keys(metadata).filter((k) => !validKeys.has(k));
@@ -46,8 +51,18 @@ export function validateMetadata(
     if (def.type === 'boolean' && typeof val !== 'boolean') {
       return { ok: false, error: 'validation_error', message: `${def.key} must be a boolean` };
     }
-    if ((def.type === 'text' || def.type === 'date') && typeof val !== 'string') {
+    if (
+      (def.type === 'text' || def.type === 'date' || def.type === 'url' || def.type === 'select') &&
+      typeof val !== 'string'
+    ) {
       return { ok: false, error: 'validation_error', message: `${def.key} must be a string` };
+    }
+    if (def.type === 'select' && def.strict && !(def.options ?? []).includes(val as string)) {
+      return {
+        ok: false,
+        error: 'validation_error',
+        message: `${def.key} must be one of: ${(def.options ?? []).join(', ')}`,
+      };
     }
   }
   return { ok: true };
@@ -418,7 +433,18 @@ function asContent(result: unknown) {
 const itemFieldSchema = z.object({
   key: z.string().describe('Metadata key stored on each list item'),
   label: z.string().optional().describe('Human-readable field label'),
-  type: z.string().describe('Field type: text, number, boolean or date'),
+  type: z.string().describe('Field type: text, number, boolean, date, url or select'),
+  strict: z
+    .boolean()
+    .optional()
+    .describe('For type "select": when true, values must appear in options; when false or omitted, any string is accepted as a suggestion'),
+  options: z
+    .array(z.string())
+    .optional()
+    .describe('For type "select": the allowed (or suggested) values'),
+  multiline: z.boolean().optional().describe('For type "text": render as a multiline textarea'),
+  table: z.boolean().optional().describe('Show this field as a column in the list table view'),
+  description: z.string().optional().describe('Help text shown alongside the field'),
 });
 
 export function registerListTools(server: McpServer) {

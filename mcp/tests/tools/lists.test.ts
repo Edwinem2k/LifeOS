@@ -352,6 +352,29 @@ describe('lists tools', () => {
     expect((result as { message: string }).message).toContain('no item_schema');
   });
 
+  it('accepts any string for an open select', () => {
+    const schema = [{ key: 'store', type: 'select' }];
+    expect(validateMetadata({ store: 'FNAC' }, schema)).toEqual({ ok: true });
+  });
+
+  it('rejects a value outside the options of a strict select', () => {
+    const schema = [{ key: 'format', type: 'select', strict: true, options: ['Film', 'Series'] }];
+    const result = validateMetadata({ format: 'Fim' }, schema);
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.message).toContain('Film');
+  });
+
+  it('accepts a listed value for a strict select', () => {
+    const schema = [{ key: 'format', type: 'select', strict: true, options: ['Film', 'Series'] }];
+    expect(validateMetadata({ format: 'Film' }, schema)).toEqual({ ok: true });
+  });
+
+  it('treats url as a string', () => {
+    const schema = [{ key: 'url', type: 'url' }];
+    expect(validateMetadata({ url: 'https://example.com' }, schema)).toEqual({ ok: true });
+    expect(validateMetadata({ url: 42 }, schema).ok).toBe(false);
+  });
+
   it('surfaces db errors as db_error on create_list_item', async () => {
     client()._setResult({ data: null, error: { message: 'boom' } });
     const result = await handleCreateListItem({ list: 'Movies', title: 'Inception' });
