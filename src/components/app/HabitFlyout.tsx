@@ -53,6 +53,13 @@ export function HabitFlyout({
       onClose={onClose}
       autoFocusTitle={autoFocusTitle}
       fields={[
+        // Body field (no `inline`), so it gets the full panel width. The name
+        // is the short label; this carries the definition — "what counts as
+        // doing this". FlyoutPanel renders body text/textarea fields with
+        // showEmptyBox, whose empty state is its own "Click to add..." and
+        // ignores `placeholder`, so we pass none — same as Projects' own
+        // Description field.
+        { key: "description", label: "Description", type: "textarea" },
         { key: "polarity", label: "Polarity", type: "select", inline: true, row: 1,
           displayAs: "pill", pillType: "polarity",
           options: HABIT_POLARITIES.map((p) => ({ value: p.value, label: p.label })) },

@@ -68,6 +68,15 @@ export function HabitRow({
 
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-text-primary truncate">{habit.name}</div>
+        {/* Only rendered when present — an always-on element would add dead
+            vertical space to every row without one. Reading order is
+            name -> what it means -> how it's measured. `truncate` is
+            deliberate: the flyout is where the full text lives. */}
+        {habit.description ? (
+          <div className="text-[11px] text-text-secondary truncate mt-0.5">
+            {habit.description}
+          </div>
+        ) : null}
         <div className="flex items-center gap-1.5 mt-0.5">
           {/* The polarity pill is what makes the circle unambiguous: on a break
               habit, filling it is a FAILURE. (Spec §5.2) */}
