@@ -46,7 +46,12 @@ export function useArchiveList() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: archiveList,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["lists"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["lists"] });
+      // getOpenCounts only counts items belonging to live lists, so archiving a
+      // list changes the counts even though no list_items row was touched.
+      qc.invalidateQueries({ queryKey: ["list-open-counts"] });
+    },
   });
 }
 
