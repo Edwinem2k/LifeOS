@@ -6,7 +6,7 @@ import { Home, FolderKanban, CheckSquare, Target, MoreHorizontal, List } from "l
 import { Logo } from "./Logo";
 import { NavDropdown, type DropdownItem } from "./NavDropdown";
 import { ListIcon } from "./ListIcon";
-import { useLists } from "@/hooks/use-lists";
+import { useLists, useOpenCounts } from "@/hooks/use-lists";
 
 const navItems = [
   { href: "/", label: "Today", icon: Home },
@@ -19,6 +19,7 @@ export function AppNav() {
   const pathname = usePathname();
 
   const { data: lists = [] } = useLists();
+  const { data: counts = {} } = useOpenCounts();
   const pinned = lists.filter((l) => l.pinned);
   const adHocCount = lists.filter((l) => !l.pinned).length;
 
@@ -27,6 +28,7 @@ export function AppNav() {
       href: `/lists/${l.id}`,
       label: l.name,
       icon: <ListIcon name={l.icon} size={15} />,
+      count: counts[l.id] ?? 0,
     })),
     {
       href: "/lists",

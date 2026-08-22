@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  getLists, getList, createList, updateList, archiveList,
+  getLists, getList, getOpenCounts, createList, updateList, archiveList,
   getListItems, createListItem, updateListItem, deleteListItem,
   type List, type ListItem,
 } from "@/services/lists";
@@ -12,6 +12,10 @@ export function useLists(opts?: { includeArchived?: boolean }) {
 
 export function useList(id: string) {
   return useQuery({ queryKey: ["lists", id], queryFn: () => getList(id), enabled: !!id });
+}
+
+export function useOpenCounts() {
+  return useQuery({ queryKey: ["list-open-counts"], queryFn: getOpenCounts });
 }
 
 export function useListItems(listId: string) {
@@ -55,6 +59,7 @@ export function useCreateListItem(listId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["list-items", listId] });
       qc.invalidateQueries({ queryKey: ["lists"] });
+      qc.invalidateQueries({ queryKey: ["list-open-counts"] });
     },
   });
 }
@@ -68,6 +73,7 @@ export function useUpdateListItem(listId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["list-items", listId] });
       qc.invalidateQueries({ queryKey: ["lists"] });
+      qc.invalidateQueries({ queryKey: ["list-open-counts"] });
     },
   });
 }
@@ -79,6 +85,7 @@ export function useDeleteListItem(listId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["list-items", listId] });
       qc.invalidateQueries({ queryKey: ["lists"] });
+      qc.invalidateQueries({ queryKey: ["list-open-counts"] });
     },
   });
 }

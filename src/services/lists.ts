@@ -48,6 +48,21 @@ export async function getLists(opts?: { includeArchived?: boolean }): Promise<Li
   return (data ?? []).map(normalise);
 }
 
+/** Open-item counts per list, for the nav. One query, not one per list. */
+export async function getOpenCounts(): Promise<Record<string, number>> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("list_items")
+    .select("list_id")
+    .eq("status", "open")
+    .is("archived_at", null);
+  if (error) throw error;
+
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) counts[row.list_id] = (counts[row.list_id] ?? 0) + 1;
+  return counts;
+}
+
 export async function getList(id: string): Promise<List> {
   const supabase = createClient();
   const { data, error } = await supabase.from("lists").select("*").eq("id", id).single();
