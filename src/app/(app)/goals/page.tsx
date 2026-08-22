@@ -17,6 +17,8 @@ import { useAreaProgress } from "@/hooks/use-area-progress";
 import { useLinkKR, useUnlinkKR, useLinksForKRs } from "@/hooks/use-links";
 import { useProjects } from "@/hooks/use-projects";
 import { useTasks } from "@/hooks/use-tasks";
+import { useHabits, useHabitLogs } from "@/hooks/use-habits";
+import { computeStats, normalizeSchedule, startOfDay, addDays } from "@/lib/habit-stats";
 import { ProgressRing } from "@/components/app/ProgressRing";
 import { StatusPill } from "@/components/app/StatusPill";
 import { toast } from "@/components/app/Toast";
@@ -26,6 +28,10 @@ import { GOAL_STATUSES, HORIZONS, LIFE_AREAS } from "@/lib/constants";
 /* ------------------------------------------------------------------ */
 /*  GoalFlyout                                                        */
 /* ------------------------------------------------------------------ */
+
+const ENTITY_LABEL: Record<string, string> = {
+  project: "Project", task: "Task", habit: "Habit",
+};
 
 function GoalFlyout({
   goal,
@@ -48,6 +54,15 @@ function GoalFlyout({
   const { data: tasks } = useTasks();
   const { data: keyResultsData } = useKeyResults(goal.id);
 
+  // Habit-backed KRs render a 30-day rate, so the flyout needs both the
+  // habits and a year of logs to feed computeStats.
+  const habitToday = useMemo(() => startOfDay(new Date()), []);
+  const { data: habits } = useHabits();
+  const { data: habitLogs = [] } = useHabitLogs(
+    addDays(habitToday, -365),
+    addDays(habitToday, 1),
+  );
+
   // Fetch links for all KRs to know which are linked
   const krIds = useMemo(
     () => (goals ?? [])
@@ -67,7 +82,7 @@ function GoalFlyout({
   const [newKRTitle, setNewKRTitle] = useState("");
   const [linkSearch, setLinkSearch] = useState<{
     krId: string | null;
-    type: "project" | "task";
+    type: "project" | "task" | "habit";
     query: string;
   } | null>(null);
 
@@ -159,7 +174,7 @@ function GoalFlyout({
 
   const handleLinkEntity = async (
     krId: string | null,
-    dstType: "project" | "task",
+    dstType: "project" | "task" | "habit",
     dstId: string,
     dstTitle: string
   ) => {
@@ -174,7 +189,7 @@ function GoalFlyout({
         targetKrId = newKR.id;
       }
       await linkKR.mutateAsync({ krId: targetKrId!, dstType, dstId });
-      toast(`${dstType === "project" ? "Project" : "Task"} linked`, "success");
+      toast(`${ENTITY_LABEL[dstType]} linked`, "success");
     } catch {
       toast("Failed to link", "error");
     }
@@ -187,9 +202,11 @@ function GoalFlyout({
     const items =
       linkSearch.type === "project"
         ? (projects ?? []).map((p: any) => ({ id: p.id, title: p.name ?? p.title }))
+        : linkSearch.type === "habit"
+        ? (habits ?? []).map((h: any) => ({ id: h.id, title: h.name }))
         : (tasks ?? []).map((t: any) => ({ id: t.id, title: t.title }));
     return items.filter((i: any) => i.title?.toLowerCase().includes(q)).slice(0, 10);
-  }, [linkSearch, projects, tasks]);
+  }, [linkSearch, projects, tasks, habits]);
 
   return (
     <>
@@ -333,49 +350,98 @@ function GoalFlyout({
               const krPct = kr.target_value > 0
                 ? Math.round(Math.min(100, ((kr.current_value ?? 0) / kr.target_value) * 100))
                 : kr.status === "done" ? 100 : 0;
+
+              // `krLinks` is undefined while useLinksForKRs is in flight, and
+              // `krs` renders from the already-loaded `goals` — so on the
+              // flyout's first paint this runs against undefined. The existing
+              // code guards it the same way at the linkedKRIds memo. TypeScript
+              // will NOT catch this: getLinksForKRs returns untyped `data ?? []`,
+              // so krLinks infers as `any`.
+              // The filter on src_id is load-bearing: krLinks spans EVERY KR of
+              // the goal, so without it one habit link would make every KR in
+              // the goal render as habit-backed.
+              const habitLink = (krLinks ?? []).find(
+                (l: any) => l.src_id === kr.id && l.dst_type === "habit",
+              );
+              const linkedHabit = habitLink
+                ? habits?.find((h: any) => h.id === habitLink.dst_id)
+                : undefined;
+
+              const habitRate = linkedHabit
+                ? computeStats(
+                    normalizeSchedule(linkedHabit.schedule),
+                    linkedHabit.polarity,
+                    new Date(linkedHabit.created_at),
+                    habitLogs
+                      .filter((l: any) => l.habit_id === linkedHabit.id)
+                      .map((l: any) => ({ loggedAt: new Date(l.logged_at) })),
+                    addDays(habitToday, -365),
+                    addDays(habitToday, 1),
+                  ).rate30d
+                : null;
+
               return (
                 <div
                   key={kr.id}
                   className="group flex items-center gap-2 py-1.5 px-2 rounded hover:bg-card"
                 >
-                  {/* Check circle */}
-                  <button
-                    onClick={() => toggleKR(kr)}
-                    className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                      kr.status === "done"
-                        ? "bg-accent-success border-accent-success text-white"
-                        : "border-border-default text-transparent hover:border-accent-primary"
-                    }`}
-                  >
-                    <Check size={12} />
-                  </button>
-
-                  {/* Title + linked badge */}
-                  <span
-                    className={`flex-1 text-sm ${
-                      kr.status === "done"
-                        ? "line-through text-text-muted"
-                        : "text-text-primary"
-                    }`}
-                  >
-                    {kr.title}
-                    {linkedKRIds.has(kr.id) && (
-                      <span className="ml-1.5 text-[0.6rem] px-1 py-0.5 bg-card border border-border-default rounded text-text-muted align-middle">
-                        Linked
+                  {habitRate !== null ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      {/* No check circle: a habit is never done. */}
+                      <span className="w-4 h-4 shrink-0 rounded-full border border-accent-info" />
+                      <span className="text-sm text-text-primary flex-1">{kr.title}</span>
+                      <div className="w-24 h-1.5 rounded-full bg-card overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-accent-info"
+                          style={{ width: `${habitRate}%` }}
+                        />
+                      </div>
+                      <span className="text-[11px] tabular-nums text-text-secondary w-10 text-right">
+                        {habitRate}%
                       </span>
-                    )}
-                  </span>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Check circle */}
+                      <button
+                        onClick={() => toggleKR(kr)}
+                        className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          kr.status === "done"
+                            ? "bg-accent-success border-accent-success text-white"
+                            : "border-border-default text-transparent hover:border-accent-primary"
+                        }`}
+                      >
+                        <Check size={12} />
+                      </button>
 
-                  {/* Progress bar */}
-                  <div className="w-16 h-1.5 bg-card rounded-full overflow-hidden shrink-0">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${krPct}%`,
-                        backgroundColor: kr.status === "done" ? "var(--color-accent-success)" : "var(--color-accent-primary)",
-                      }}
-                    />
-                  </div>
+                      {/* Title + linked badge */}
+                      <span
+                        className={`flex-1 text-sm ${
+                          kr.status === "done"
+                            ? "line-through text-text-muted"
+                            : "text-text-primary"
+                        }`}
+                      >
+                        {kr.title}
+                        {linkedKRIds.has(kr.id) && (
+                          <span className="ml-1.5 text-[0.6rem] px-1 py-0.5 bg-card border border-border-default rounded text-text-muted align-middle">
+                            Linked
+                          </span>
+                        )}
+                      </span>
+
+                      {/* Progress bar */}
+                      <div className="w-16 h-1.5 bg-card rounded-full overflow-hidden shrink-0">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${krPct}%`,
+                            backgroundColor: kr.status === "done" ? "var(--color-accent-success)" : "var(--color-accent-primary)",
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
 
                   {/* Hover actions — only show push/link for unlinked KRs */}
                   <div className="hidden group-hover:flex items-center gap-1">
@@ -465,9 +531,10 @@ function GoalFlyout({
               + Link task
             </button>
             <button
-              disabled
-              title="Coming soon"
-              className="text-xs text-text-muted border border-border-default rounded px-2 py-1 opacity-50 cursor-not-allowed"
+              onClick={() =>
+                setLinkSearch({ krId: null, type: "habit", query: "" })
+              }
+              className="text-xs text-text-muted hover:text-accent-primary border border-border-default rounded px-2 py-1"
             >
               + Link habit
             </button>
