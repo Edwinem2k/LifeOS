@@ -16,6 +16,8 @@ import {
   computeStats, normalizeSchedule, startOfDay, addDays, type Polarity,
 } from "@/lib/habit-stats";
 
+// Also hardcoded as `365` in goals/page.tsx so both pages share one
+// `useHabitLogs` cache entry. Change both together.
 const STATS_WINDOW_DAYS = 365;
 
 export default function HabitsPage() {
