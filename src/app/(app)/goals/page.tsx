@@ -29,7 +29,9 @@ import { GOAL_STATUSES, HORIZONS, LIFE_AREAS } from "@/lib/constants";
 /*  GoalFlyout                                                        */
 /* ------------------------------------------------------------------ */
 
-const ENTITY_LABEL: Record<string, string> = {
+// Keyed by the union rather than `string` so the map stays exhaustive: adding a
+// fourth entity type becomes a compile error instead of an "undefined linked" toast.
+const ENTITY_LABEL: Record<"project" | "task" | "habit", string> = {
   project: "Project", task: "Task", habit: "Habit",
 };
 
@@ -58,6 +60,13 @@ function GoalFlyout({
   // habits and a year of logs to feed computeStats.
   const habitToday = useMemo(() => startOfDay(new Date()), []);
   const { data: habits } = useHabits();
+  // 365 must match STATS_WINDOW_DAYS in habits/page.tsx: identical from/to
+  // produce an identical useHabitLogs query key, so both pages share one
+  // cache entry instead of fetching two overlapping windows.
+  //
+  // The `= []` default mints a fresh array identity every render while the
+  // query is in flight. Safe ONLY because nothing memoizes on habitLogs — the
+  // moment something does, it needs a stable empty array (cf. 59885c3).
   const { data: habitLogs = [] } = useHabitLogs(
     addDays(habitToday, -365),
     addDays(habitToday, 1),
