@@ -1,4 +1,12 @@
--- 009_habits_description.sql
+-- 010_habits_description.sql
+--
+-- RENUMBERED 009 -> 010 on 22 Aug. It was WRITTEN AND APPLIED to the live
+-- database as 009, before we saw that the parallel Lists branch had also
+-- claimed 009 (008_lists_pinned_notes.sql, itself already applied — different
+-- tables, so no schema conflict, only a duplicated file number). We renumbered
+-- rather than the Lists branch because that work was mid-flight with uncommitted
+-- changes and this was finished. Both are live; the number is ordering
+-- documentation only, and this file's relative order is unchanged.
 --
 -- Adds a free-text `description` to habits: the name stays a short label
 -- ("Gym"), the description carries the definition ("at least 3x per week,

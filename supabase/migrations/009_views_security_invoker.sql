@@ -1,4 +1,12 @@
--- 008_views_security_invoker.sql
+-- 009_views_security_invoker.sql
+--
+-- RENUMBERED 008 -> 009 on 22 Aug. It was WRITTEN AND APPLIED to the live
+-- database as 008, before we saw that the parallel Lists branch had also
+-- claimed 008 (008_lists_pinned_notes.sql, itself already applied — different
+-- tables, so no schema conflict, only a duplicated file number). We renumbered
+-- rather than the Lists branch because that work was mid-flight with uncommitted
+-- changes and this was finished. Both are live; the number is ordering
+-- documentation only, and this file's relative order is unchanged.
 --
 -- SECURITY FIX: every view in 002_views.sql bypasses row-level security.
 --
