@@ -22,7 +22,7 @@
 
 **Two corrections to the spec, discovered while planning. The plan is right; the spec is stale.**
 
-1. **§5.4 says the flyout needs the `children` prop being added on `feat/habits-page`. It does not.** `FieldConfig` already supports `text | textarea | select | date | number`, which covers every schema type we need. Lists therefore has **no dependency on the habits branch at all** — do not wait for it, and do not modify `FlyoutPanel.tsx`.
+1. **§5.4 says the flyout needs the `children` prop being added on `feat/habits-page`. It does not.** `FieldConfig` already supports `text | textarea | select | date | number`, which covers every schema type we need. Lists therefore has **no dependency on the habits branch at all** — do not wait for it. (Task 12b does add one `creatable` field to `FieldConfig` and forwards it, but that is a three-line pass-through, not the `children` prop.)
 2. **§5.4 lists a "Linked items" block. It is out of scope.** Promote-to-project is v2 (spec §5.6), so there is nothing to link yet. Omitting it is what keeps `FlyoutPanel` untouched.
 
 **Migration number is 008.** Verified: `main` holds 001–005 and 007. `006_habits_area.sql` exists only on `feat/habits-page`, so 008 is free on both branches and will not collide on merge.
@@ -1317,6 +1317,103 @@ Expected: counts show in the dropdown and drop by one when an item is ticked.
 ```bash
 git add src/services/lists.ts src/hooks/use-lists.ts src/components/app/AppNav.tsx
 git commit -m "feat(lists): open-item counts in the nav dropdown"
+```
+
+---
+
+### Task 12b: Creatable selects
+
+**Added 22 Aug after spec review.** Without this, spec §3.5's headline promise — "type a new value
+once and it is a suggestion forever" — works only for agents. `toFieldConfigs` maps an open select
+onto `EditableCell`'s select, which renders a CLOSED dropdown; `searchable` only filters existing
+options and offers "No results". A human editing the flyout has no way to introduce a new value.
+Axel's call, 22 Aug: he wants to add values himself.
+
+**Files:**
+- Modify: `src/components/app/EditableCell.tsx`
+- Modify: `src/components/app/FlyoutPanel.tsx:16` and the two select branches at `:113` and `:172`
+- Modify: `src/lib/list-schema.ts` (`toFieldConfigs`)
+- Test: `src/lib/list-schema.test.ts`
+
+- [ ] **Step 1: Write the failing tests** (`src/lib/list-schema.test.ts`)
+
+```typescript
+describe("toFieldConfigs — creatable selects", () => {
+  it("makes an open select searchable and creatable", () => {
+    const [config] = toFieldConfigs([{ key: "buy_from", label: "Buy from", type: "select" }], []);
+    expect(config).toMatchObject({ type: "select", searchable: true, creatable: true });
+  });
+
+  it("leaves a strict select closed", () => {
+    const [config] = toFieldConfigs(
+      [{ key: "format", label: "Format", type: "select", strict: true, options: ["Film", "Series"] }],
+      [],
+    );
+    expect(config.creatable).toBeUndefined();
+    expect(config.searchable).toBeUndefined();
+  });
+
+  it("does not make a boolean select creatable", () => {
+    const [config] = toFieldConfigs([{ key: "signed", label: "Signed", type: "boolean" }], []);
+    expect(config.creatable).toBeUndefined();
+  });
+});
+```
+
+- [ ] **Step 2: Run and watch it fail**
+
+Run: `npx vitest run src/lib/list-schema.test.ts`
+Expected: FAIL — `creatable` is undefined on the open select.
+
+- [ ] **Step 3: `EditableCell` gains a `creatable` prop**
+
+Add `creatable?: boolean` to `Props` and destructure it with a `false` default. Then, inside the
+select dropdown, after the filtered options and replacing the bare "No results" branch:
+
+- When `creatable` is true, `searchQuery` is non-empty, and no option's `label` matches
+  `searchQuery` case-insensitively **exactly**, render a final row reading `Add "<searchQuery>"`
+  with a `Plus` icon from lucide-react.
+- Clicking that row commits `searchQuery` through **exactly the same code path** an option click
+  uses: close the dropdown, clear the search, `setCurrent`, `setSaving(true)`, `onSave(...)`,
+  then the same success/error toasts and `setSaving(false)`. Do NOT write a second save path —
+  extract the existing one into a local `commit(nextValue: string)` helper and call it from both.
+- Pressing Enter in the search input triggers the same row when it is showing.
+- When `creatable` is false, behaviour is exactly as today, including "No results".
+
+`creatable` implies searchable — a creatable select with no search input has nowhere to type. Treat
+`creatable` as forcing the search input on even if `searchable` was not passed.
+
+- [ ] **Step 4: `FlyoutPanel` forwards it**
+
+Add `creatable?: boolean` to `FieldConfig` (`:7-19`), then pass `creatable={field.creatable}`
+alongside the existing `searchable={field.searchable}` at both `:113` and `:172`.
+
+- [ ] **Step 5: `toFieldConfigs` sets it**
+
+In the `case "select"` branch, set `searchable: true, creatable: true` **only when `def.strict` is
+not true**. A strict select must stay closed — that is the whole point of `strict`, and it is what
+stops "Fim" becoming a permanent suggestion. The `boolean` branch builds its own yes/no select and
+must NOT become creatable.
+
+- [ ] **Step 6: Run and watch it pass**
+
+Run: `npx vitest run src/lib/list-schema.test.ts` — expect 35 tests.
+Run: `npx tsc --noEmit` and `npx eslint src/components/app/EditableCell.tsx src/components/app/FlyoutPanel.tsx` — both clean.
+
+- [ ] **Step 7: Regression-check the shared component by hand**
+
+`EditableCell` is used by Tasks, Projects and Goals. `creatable` defaults to false, so those are
+unaffected — but confirm it, because a regression here breaks three working pages:
+
+- [ ] Tasks page: change a status via its pill dropdown. Still saves, still shows no search box.
+- [ ] Projects page: change an area. Unchanged.
+- [ ] Goals flyout: the searchable project/task picker still filters and still says "No results".
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/components/app/EditableCell.tsx src/components/app/FlyoutPanel.tsx src/lib/list-schema.ts src/lib/list-schema.test.ts
+git commit -m "feat(lists): creatable selects, so new values can be added by hand"
 ```
 
 ---
