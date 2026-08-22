@@ -247,6 +247,9 @@ export default function ListDetailPage({ params }: { params: Promise<{ id: strin
               value={list.name}
               onSave={saveName}
               className="text-2xl font-semibold min-w-0 truncate"
+              // Without this the title collapses from 2xl to the cell default the
+              // instant it is clicked, which reads as the page breaking.
+              inputClassName="!text-2xl font-semibold"
             />
           </div>
           <p className="text-xs text-text-secondary tabular-nums mt-1">

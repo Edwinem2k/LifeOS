@@ -24,6 +24,12 @@ type Props = {
    */
   creatable?: boolean;
   autoFocus?: boolean;
+  /**
+   * Extra classes for the editing input only. `className` styles the display
+   * state; without this a cell that displays at text-2xl collapses to text-sm
+   * the moment it is clicked. Opt-in, so every existing call site is unaffected.
+   */
+  inputClassName?: string;
 };
 
 export function EditableCell({
@@ -39,6 +45,7 @@ export function EditableCell({
   searchable = false,
   creatable = false,
   autoFocus = false,
+  inputClassName = "",
 }: Props) {
   const [editing, setEditing] = useState(autoFocus);
   const [current, setCurrent] = useState(value);
@@ -348,7 +355,7 @@ export function EditableCell({
       onBlur={handleSave}
       onKeyDown={(e) => e.key === "Enter" && handleSave()}
       onClick={(e) => e.stopPropagation()}
-      className="border border-border-default rounded-sm px-2 py-1 bg-card text-text-primary text-sm focus:outline-none focus:border-accent-primary w-full"
+      className={`border border-border-default rounded-sm px-2 py-1 bg-card text-text-primary text-sm focus:outline-none focus:border-accent-primary w-full ${inputClassName}`}
     />
   );
 }
