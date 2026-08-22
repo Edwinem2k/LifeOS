@@ -6,6 +6,11 @@ import { listKindSchema, listItemStatusSchema } from '../types.js';
 
 // --- Item schema helpers ---
 
+/** The only field types the web app and validateMetadata know how to render and check. */
+export const ITEM_FIELD_TYPES = ['text', 'number', 'boolean', 'date', 'select', 'url'] as const;
+
+export type ItemFieldType = (typeof ITEM_FIELD_TYPES)[number];
+
 export interface ItemFieldDef {
   key: string;
   label?: string;
@@ -45,24 +50,45 @@ export function validateMetadata(
   for (const def of schema) {
     const val = metadata[def.key];
     if (val === undefined || val === null) continue;
-    if (def.type === 'number' && typeof val !== 'number') {
-      return { ok: false, error: 'validation_error', message: `${def.key} must be a number` };
-    }
-    if (def.type === 'boolean' && typeof val !== 'boolean') {
-      return { ok: false, error: 'validation_error', message: `${def.key} must be a boolean` };
-    }
-    if (
-      (def.type === 'text' || def.type === 'date' || def.type === 'url' || def.type === 'select') &&
-      typeof val !== 'string'
-    ) {
-      return { ok: false, error: 'validation_error', message: `${def.key} must be a string` };
-    }
-    if (def.type === 'select' && def.strict && !(def.options ?? []).includes(val as string)) {
-      return {
-        ok: false,
-        error: 'validation_error',
-        message: `${def.key} must be one of: ${(def.options ?? []).join(', ')}`,
-      };
+    switch (def.type) {
+      case 'number':
+        if (typeof val !== 'number') {
+          return { ok: false, error: 'validation_error', message: `${def.key} must be a number` };
+        }
+        break;
+      case 'boolean':
+        if (typeof val !== 'boolean') {
+          return { ok: false, error: 'validation_error', message: `${def.key} must be a boolean` };
+        }
+        break;
+      case 'text':
+      case 'date':
+      case 'url':
+        if (typeof val !== 'string') {
+          return { ok: false, error: 'validation_error', message: `${def.key} must be a string` };
+        }
+        break;
+      case 'select':
+        if (typeof val !== 'string') {
+          return { ok: false, error: 'validation_error', message: `${def.key} must be a string` };
+        }
+        if (def.strict && !(def.options ?? []).includes(val)) {
+          return {
+            ok: false,
+            error: 'validation_error',
+            message: `${def.key} must be one of: ${(def.options ?? []).join(', ')}`,
+          };
+        }
+        break;
+      default:
+        // The tool boundary rejects unknown types, but item_schema rows written
+        // before that existed can still carry anything. Falling through here
+        // would let a value of any shape land in jsonb unchecked.
+        return {
+          ok: false,
+          error: 'validation_error',
+          message: `${def.key} has an unsupported field type "${def.type}" in this list's item_schema, so its value cannot be validated. Fix the list item_schema with update_list — valid types are: ${ITEM_FIELD_TYPES.join(', ')}.`,
+        };
     }
   }
   return { ok: true };
@@ -177,13 +203,16 @@ export async function handleCreateListItem(params: {
   // New items land at the bottom, matching how the web app orders tasks and
   // projects. Without this the MCP inserts a null sort_order and agent-added
   // items interleave unpredictably with UI-added ones.
+  // nullsFirst: false is load-bearing — sort_order is nullable and Postgres
+  // defaults DESC to NULLS FIRST, so a single legacy null row would otherwise
+  // read back as the max and pin every new item to the top.
   const { data: last } = await client
     .from('list_items')
     .select('sort_order')
     .eq('user_id', USER_ID)
     .eq('list_id', resolved.row.id)
     .is('archived_at', null)
-    .order('sort_order', { ascending: false })
+    .order('sort_order', { ascending: false, nullsFirst: false })
     .limit(1);
 
   const lastRows = (last ?? []) as Array<{ sort_order: number | null }>;
@@ -433,7 +462,9 @@ function asContent(result: unknown) {
 const itemFieldSchema = z.object({
   key: z.string().describe('Metadata key stored on each list item'),
   label: z.string().optional().describe('Human-readable field label'),
-  type: z.string().describe('Field type: text, number, boolean, date, url or select'),
+  type: z
+    .enum(ITEM_FIELD_TYPES)
+    .describe('Field type: text, number, boolean, date, url or select'),
   strict: z
     .boolean()
     .optional()

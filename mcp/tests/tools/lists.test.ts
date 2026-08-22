@@ -375,6 +375,37 @@ describe('lists tools', () => {
     expect(validateMetadata({ url: 42 }, schema).ok).toBe(false);
   });
 
+  it('rejects a field type outside the supported vocabulary', () => {
+    // An item_schema row written before the tool boundary was locked down can
+    // carry any string. Falling through would let anything land in jsonb.
+    const schema = [{ key: 'rating', type: 'integer' }];
+    for (const val of [5, 'not a number', [], {}] as unknown[]) {
+      const result = validateMetadata({ rating: val }, schema);
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.message).toContain('rating');
+      expect(result.ok === false && result.message).toContain('integer');
+      expect(result.ok === false && result.message).toContain('number');
+      expect(result.ok === false && result.message).toContain('select');
+    }
+  });
+
+  it('create_list_item refuses metadata for a field with an unrecognised type', async () => {
+    vi.mocked(resolveEntity).mockResolvedValue({
+      ok: true,
+      row: { id: 'list-1', name: 'Movies', item_schema: [{ key: 'rating', type: 'integer' }] },
+    } as never);
+
+    const result = await handleCreateListItem({
+      list: 'Movies',
+      title: 'Inception',
+      metadata: { rating: 'not a number' },
+    });
+
+    expect(result).toMatchObject({ ok: false, error: 'validation_error' });
+    expect((result as { message: string }).message).toContain('rating');
+    expect(client()._queryBuilder.insert).not.toHaveBeenCalled();
+  });
+
   it('surfaces db errors as db_error on create_list_item', async () => {
     client()._setResult({ data: null, error: { message: 'boom' } });
     const result = await handleCreateListItem({ list: 'Movies', title: 'Inception' });
@@ -391,6 +422,22 @@ describe('lists tools', () => {
 
     const inserted = (insertBuilder as Record<string, any>).insert.mock.calls[0][0];
     expect(inserted.sort_order).toBe(8);
+  });
+
+  it('create_list_item asks Postgres for NULLS LAST when reading the max sort_order', async () => {
+    // sort_order is nullable with no default and legacy null rows exist. A bare
+    // `sort_order.desc` puts NULLS FIRST in Postgres, so the max reads as 0 and
+    // every agent-created item lands at the TOP of the list.
+    const maxBuilder = createMockQueryBuilder({ data: [{ sort_order: 7 }], error: null });
+    const insertBuilder = createMockQueryBuilder({ data: [{ id: 'item-1' }], error: null });
+    client().from.mockReturnValueOnce(maxBuilder as never).mockReturnValue(insertBuilder as never);
+
+    await handleCreateListItem({ list: 'Movies', title: 'Dune' });
+
+    expect((maxBuilder as Record<string, any>).order).toHaveBeenCalledWith(
+      'sort_order',
+      expect.objectContaining({ ascending: false, nullsFirst: false }),
+    );
   });
 
   it('create_list_item starts an empty list at sort_order 1', async () => {
