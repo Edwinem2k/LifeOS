@@ -3010,6 +3010,11 @@ circle, because a habit is never done."
 - [ ] Set a habit inactive; it dims, the circle disables, it disappears from Active and returns under All
 - [ ] Link a habit to a KR from Goals; that KR shows a rate and no check circle, and **other KRs in the same goal are unaffected**
 - [ ] Mark that KR done; the habit is unaffected
+- [ ] **Set that linked habit inactive, then toggle the KR's circle.** `useHabits()` excludes
+      inactive habits, so `linkedHabit` goes undefined and the KR silently reverts to the
+      check-circle branch — which restores `toggleKR` and lets the KR be marked done. Reactivate
+      the habit and confirm what that leaves behind: the rate row returns with a `status: "done"`
+      persisting invisibly underneath it. Exercise the toggle, don't just eyeball the rendering
 - [ ] A Mon/Wed/Fri habit is absent from Today on a Tuesday
 - [ ] **Create a habit and check the summary strip immediately: the 30-day rate reads `0%`, never `NaN%`. Repeat with a 3x/week habit, which has no closed period for up to a week, and confirm it does not poison the average**
 - [ ] "On track" counts a per-week habit that met its target earlier in the week
