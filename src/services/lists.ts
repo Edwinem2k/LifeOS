@@ -31,8 +31,11 @@ export type ListItem = {
   archived_at: string | null;
 };
 
+/** A row as postgrest returns it: item_schema is raw jsonb, not yet known to be an array. */
+type ListRow = Omit<List, "item_schema"> & { item_schema: unknown };
+
 /** item_schema is jsonb and may be null or malformed on hand-edited rows. */
-function normalise(row: any): List {
+function normalise(row: ListRow): List {
   return { ...row, item_schema: Array.isArray(row.item_schema) ? row.item_schema : [] };
 }
 
@@ -51,11 +54,15 @@ export async function getLists(opts?: { includeArchived?: boolean }): Promise<Li
 /** Open-item counts per list, for the nav. One query, not one per list. */
 export async function getOpenCounts(): Promise<Record<string, number>> {
   const supabase = createClient();
+  // The !inner embed is load-bearing. Without a join to lists, every open item counts,
+  // including items on archived lists — so an archived card showed a live "12 open
+  // items" and the nav totals stayed inflated by lists the user had put away.
   const { data, error } = await supabase
     .from("list_items")
-    .select("list_id")
+    .select("list_id, lists!inner(archived_at)")
     .eq("status", "open")
-    .is("archived_at", null);
+    .is("archived_at", null)
+    .is("lists.archived_at", null);
   if (error) throw error;
 
   const counts: Record<string, number> = {};
@@ -101,6 +108,9 @@ export async function archiveList(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** metadata is jsonb defaulting to '{}', but the column is nullable, so old rows may hold null. */
+type ListItemRow = Omit<ListItem, "metadata"> & { metadata: Record<string, unknown> | null };
+
 export async function getListItems(listId: string): Promise<ListItem[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -110,7 +120,7 @@ export async function getListItems(listId: string): Promise<ListItem[]> {
     .is("archived_at", null)
     .order("sort_order", { ascending: true, nullsFirst: false });
   if (error) throw error;
-  return (data ?? []).map((row: any) => ({ ...row, metadata: row.metadata ?? {} }));
+  return (data ?? []).map((row: ListItemRow) => ({ ...row, metadata: row.metadata ?? {} }));
 }
 
 export async function createListItem(

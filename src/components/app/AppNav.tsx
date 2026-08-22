@@ -21,7 +21,6 @@ export function AppNav() {
   const { data: lists = [] } = useLists();
   const { data: counts = {} } = useOpenCounts();
   const pinned = lists.filter((l) => l.pinned);
-  const adHocCount = lists.filter((l) => !l.pinned).length;
 
   const listItems: DropdownItem[] = [
     ...pinned.map((l) => ({
@@ -31,11 +30,14 @@ export function AppNav() {
       count: counts[l.id] ?? 0,
     })),
     {
+      // No count. Every row above it counts open items, so a count here landed in the
+      // same numeric slot and read as "3 open items across all lists" when it was
+      // really the number of ad-hoc lists — and it did not match the destination
+      // either, since /lists shows all three bands, not just the ad-hoc one.
       href: "/lists",
       label: "All lists",
       icon: <List size={15} />,
       muted: true,
-      count: adHocCount,
       dividerBefore: true,
     },
   ];

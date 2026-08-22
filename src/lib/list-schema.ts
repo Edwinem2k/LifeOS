@@ -172,7 +172,7 @@ export function toFieldConfigs(
 export function flattenItem(item: {
   metadata?: Record<string, unknown> | null;
   [key: string]: unknown;
-}): Record<string, any> {
+}): Record<string, unknown> {
   const { metadata, ...core } = item;
   return { ...(metadata ?? {}), ...core };
 }

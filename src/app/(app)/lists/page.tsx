@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { useLists, useCreateList, useOpenCounts } from "@/hooks/use-lists";
 import { ListIcon } from "@/components/app/ListIcon";
+import { toast } from "@/components/app/Toast";
 import type { List } from "@/services/lists";
 
 const GRID = "grid grid-cols-[repeat(auto-fill,minmax(232px,1fr))] gap-3";
@@ -48,7 +49,7 @@ export default function ListsPage() {
   const router = useRouter();
   const [showArchived, setShowArchived] = useState(false);
 
-  const { data: lists } = useLists({ includeArchived: true });
+  const { data: lists, isLoading, isError } = useLists({ includeArchived: true });
   const { data: counts = {} } = useOpenCounts();
   const createList = useCreateList();
 
@@ -68,7 +69,41 @@ export default function ListsPage() {
   function handleCreate() {
     createList.mutate(
       { name: "Untitled list" },
-      { onSuccess: (created) => router.push(`/lists/${created.id}`) }
+      {
+        onSuccess: (created) => router.push(`/lists/${created.id}`),
+        // Without this the button just re-enables itself and nothing else happens,
+        // so a failed create is indistinguishable from a click that did not register.
+        onError: () => toast("Failed to create list", "error"),
+      }
+    );
+  }
+
+  // --- Loading ---
+  if (isLoading) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-semibold">Lists</h1>
+        </div>
+        <p className="text-sm text-text-secondary">Loading lists...</p>
+      </div>
+    );
+  }
+
+  // --- Error ---
+  // Branching on isError matters because `data` is also undefined once the retries
+  // are exhausted: keying the loading state off `!lists` left a network failure,
+  // an expired session or an RLS denial saying "Loading lists..." forever.
+  if (isError) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-semibold">Lists</h1>
+        </div>
+        <p className="text-accent-danger">
+          Error loading lists. Check the browser console for details.
+        </p>
+      </div>
     );
   }
 
@@ -78,66 +113,62 @@ export default function ListsPage() {
         <h1 className="text-2xl font-semibold">Lists</h1>
       </div>
 
-      {!lists ? (
-        <p className="text-sm text-text-secondary">Loading lists...</p>
-      ) : (
-        <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8">
+        <section>
+          <BandHeading label="Pinned" />
+          {pinned.length === 0 ? (
+            <p className="text-sm text-text-muted">No pinned lists</p>
+          ) : (
+            <div className={GRID}>
+              {pinned.map((l) => (
+                <ListCard key={l.id} list={l} count={counts[l.id] ?? 0} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section>
+          <BandHeading label="Ad-hoc" />
+          <div className={GRID}>
+            {adHoc.map((l) => (
+              <ListCard key={l.id} list={l} count={counts[l.id] ?? 0} />
+            ))}
+            <button
+              type="button"
+              onClick={handleCreate}
+              disabled={createList.isPending}
+              className="flex items-center justify-center gap-2 p-3 min-h-[92px] border border-dashed border-border-default rounded-md text-sm font-medium text-text-secondary transition-colors hover:text-accent-primary hover:border-accent-primary disabled:opacity-60"
+            >
+              <Plus size={15} />
+              New list
+            </button>
+          </div>
+        </section>
+
+        {archived.length > 0 && (
           <section>
-            <BandHeading label="Pinned" />
-            {pinned.length === 0 ? (
-              <p className="text-sm text-text-muted">No pinned lists</p>
-            ) : (
+            <div className="flex items-center gap-3 mb-3">
+              <button
+                type="button"
+                onClick={() => setShowArchived((v) => !v)}
+                aria-expanded={showArchived}
+                className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-text-secondary transition-colors hover:text-text-primary"
+              >
+                {showArchived ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                Archived · {archived.length}
+              </button>
+              <div className="h-px flex-1 bg-border-default" />
+            </div>
+            {showArchived && (
               <div className={GRID}>
-                {pinned.map((l) => (
-                  <ListCard key={l.id} list={l} count={counts[l.id] ?? 0} />
+                {archived.map((l) => (
+                  <ListCard key={l.id} list={l} count={counts[l.id] ?? 0} dimmed />
                 ))}
               </div>
             )}
           </section>
-
-          <section>
-            <BandHeading label="Ad-hoc" />
-            <div className={GRID}>
-              {adHoc.map((l) => (
-                <ListCard key={l.id} list={l} count={counts[l.id] ?? 0} />
-              ))}
-              <button
-                type="button"
-                onClick={handleCreate}
-                disabled={createList.isPending}
-                className="flex items-center justify-center gap-2 p-3 min-h-[92px] border border-dashed border-border-default rounded-md text-sm font-medium text-text-secondary transition-colors hover:text-accent-primary hover:border-accent-primary disabled:opacity-60"
-              >
-                <Plus size={15} />
-                New list
-              </button>
-            </div>
-          </section>
-
-          {archived.length > 0 && (
-            <section>
-              <div className="flex items-center gap-3 mb-3">
-                <button
-                  type="button"
-                  onClick={() => setShowArchived((v) => !v)}
-                  aria-expanded={showArchived}
-                  className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-text-secondary transition-colors hover:text-text-primary"
-                >
-                  {showArchived ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                  Archived · {archived.length}
-                </button>
-                <div className="h-px flex-1 bg-border-default" />
-              </div>
-              {showArchived && (
-                <div className={GRID}>
-                  {archived.map((l) => (
-                    <ListCard key={l.id} list={l} count={counts[l.id] ?? 0} dimmed />
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
