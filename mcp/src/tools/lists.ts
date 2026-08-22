@@ -430,7 +430,7 @@ export async function handleArchiveList(params: { identifier: string }) {
   await audit('delete', 'lists', resolved.row.id as string, { before: resolved.row });
   return {
     ok: true as const,
-    message: `List "${resolved.row.name}" archived. Its items are archived with it.`,
+    message: `List "${resolved.row.name}" archived. It no longer appears in list_lists or in the app.`,
   };
 }
 
@@ -458,6 +458,26 @@ export async function handleDeleteListItem(params: { identifier: string; list?: 
 function asContent(result: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
 }
+
+/**
+ * The web app resolves `icon` against a whitelist of Lucide component names and
+ * silently falls back to a generic glyph for anything else — an emoji renders as
+ * an anonymous grey icon with no error. Keep this list in step with the app.
+ */
+const LIST_ICON_NAMES = [
+  'BookOpen',
+  'Clapperboard',
+  'ShoppingBag',
+  'Lightbulb',
+  'List',
+  'Luggage',
+  'Home',
+  'Gift',
+  'Dumbbell',
+  'MapPin',
+] as const;
+
+const LIST_ICON_DESCRIPTION = `Lucide component name for the list icon — not an emoji, which renders as a blank generic icon. One of: ${LIST_ICON_NAMES.join(', ')}. Anything else falls back to a generic icon.`;
 
 const itemFieldSchema = z.object({
   key: z.string().describe('Metadata key stored on each list item'),
@@ -493,7 +513,7 @@ export function registerListTools(server: McpServer) {
       name: z.string().describe('List name, e.g. "Movies to watch"'),
       kind: listKindSchema.optional().default('custom').describe('List kind'),
       description: z.string().optional().describe('What this list is for'),
-      icon: z.string().optional().describe('Emoji or icon for the list'),
+      icon: z.string().optional().describe(LIST_ICON_DESCRIPTION),
       item_schema: z
         .array(itemFieldSchema)
         .optional()
@@ -554,7 +574,7 @@ export function registerListTools(server: McpServer) {
       name: z.string().optional().describe('New list name'),
       description: z.string().optional().describe('What this list is for'),
       notes: z.string().optional().describe('Freeform notes about the list'),
-      icon: z.string().optional().describe('Emoji or icon name for the list'),
+      icon: z.string().optional().describe(LIST_ICON_DESCRIPTION),
       pinned: z
         .boolean()
         .optional()

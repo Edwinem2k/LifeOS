@@ -129,7 +129,7 @@ describe('lists tools', () => {
       name: 'Movies',
       kind: 'movies',
       description: 'Films to watch',
-      icon: '🎬',
+      icon: 'Clapperboard',
       item_schema: MOVIE_SCHEMA,
     });
 
@@ -137,7 +137,7 @@ describe('lists tools', () => {
     expect(inserted).toMatchObject({
       kind: 'movies',
       description: 'Films to watch',
-      icon: '🎬',
+      icon: 'Clapperboard',
       item_schema: MOVIE_SCHEMA,
     });
   });
@@ -459,14 +459,14 @@ describe('lists tools', () => {
     const result = await handleUpdateList({
       identifier: 'Movies',
       name: 'Films',
-      icon: 'clapperboard',
+      icon: 'Clapperboard',
       pinned: true,
       pin_order: 2,
     });
 
     expect(result).toMatchObject({ ok: true });
     const patch = client()._queryBuilder.update.mock.calls[0][0];
-    expect(patch).toMatchObject({ name: 'Films', icon: 'clapperboard', pinned: true, pin_order: 2 });
+    expect(patch).toMatchObject({ name: 'Films', icon: 'Clapperboard', pinned: true, pin_order: 2 });
     expect(patch.identifier).toBeUndefined();
     expect(client()._queryBuilder.eq).toHaveBeenCalledWith('user_id', 'test-user');
     expect(audit).toHaveBeenCalledWith('update', 'lists', 'list-1', expect.anything());
