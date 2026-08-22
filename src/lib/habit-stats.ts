@@ -5,6 +5,15 @@
  *
  * Core idea: the schedule defines a PERIOD, and streaks count periods
  * rather than days. See spec §2.
+ *
+ * ARGUMENT ORDER IS PINNED BY TESTS, NOT BY THE COMPILER. `dotState` and
+ * `canBackfill` each take three consecutive `Date` parameters in the order
+ * (createdAt, date, today), so ANY permutation of them type-checks silently —
+ * TypeScript cannot tell one Date from another. The defence is the test suite:
+ * every adjacent transposition of those three was verified to break at least
+ * one test in habit-stats.test.ts. If you reorder or insert a Date parameter,
+ * a red test is the only thing that will tell you; do not assume the compiler
+ * is protecting you.
  */
 
 /* ------------------------------------------------------------------ */

@@ -59,7 +59,16 @@ function GoalFlyout({
   // Habit-backed KRs render a 30-day rate, so the flyout needs both the
   // habits and a year of logs to feed computeStats.
   const habitToday = useMemo(() => startOfDay(new Date()), []);
-  const { data: habits } = useHabits();
+  // includeInactive is deliberate — do NOT "simplify" this back to useHabits().
+  // A KR linked to a DEACTIVATED habit must still resolve to its habit. If it
+  // does not, `linkedHabit` goes undefined, the KR falls through to the
+  // check-circle branch, and `toggleKR` comes back: the user can tick a
+  // habit-backed KR, and reactivating the habit hides the tick again while
+  // leaving status="done" persisted underneath — so the header counts a
+  // completion that no visible row can clear.
+  // The link-search dropdown narrows back to active habits at its own point of
+  // use, so this cannot be used to newly link an inactive habit.
+  const { data: habitsIncludingInactive } = useHabits(true);
   // 365 must match STATS_WINDOW_DAYS in habits/page.tsx: identical from/to
   // produce an identical useHabitLogs query key, so both pages share one
   // cache entry instead of fetching two overlapping windows.
@@ -212,10 +221,14 @@ function GoalFlyout({
       linkSearch.type === "project"
         ? (projects ?? []).map((p: any) => ({ id: p.id, title: p.name ?? p.title }))
         : linkSearch.type === "habit"
-        ? (habits ?? []).map((h: any) => ({ id: h.id, title: h.name }))
+        ? // Active only: resolving an existing link must see inactive habits,
+          // but creating a NEW one must not offer them.
+          (habitsIncludingInactive ?? [])
+            .filter((h) => h.active)
+            .map((h: any) => ({ id: h.id, title: h.name }))
         : (tasks ?? []).map((t: any) => ({ id: t.id, title: t.title }));
     return items.filter((i: any) => i.title?.toLowerCase().includes(q)).slice(0, 10);
-  }, [linkSearch, projects, tasks, habits]);
+  }, [linkSearch, projects, tasks, habitsIncludingInactive]);
 
   return (
     <>
@@ -373,7 +386,7 @@ function GoalFlyout({
                 (l: any) => l.src_id === kr.id && l.dst_type === "habit",
               );
               const linkedHabit = habitLink
-                ? habits?.find((h: any) => h.id === habitLink.dst_id)
+                ? habitsIncludingInactive?.find((h: any) => h.id === habitLink.dst_id)
                 : undefined;
 
               const habitRate = linkedHabit

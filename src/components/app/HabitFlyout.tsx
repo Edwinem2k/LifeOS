@@ -27,6 +27,7 @@ export function HabitFlyout({
 
   const schedule = normalizeSchedule(habit.schedule);
   const polarity = habit.polarity as Polarity;
+  const createdAt = new Date(habit.created_at);
 
   const loggedDays = new Set(
     logs.map((l: any) => startOfDay(new Date(l.logged_at)).getTime()),
@@ -35,7 +36,7 @@ export function HabitFlyout({
   const stats = computeStats(
     schedule,
     polarity,
-    new Date(habit.created_at),
+    createdAt,
     logs.map((l: any) => ({ loggedAt: new Date(l.logged_at) })),
     new Date(0),                     // unbounded; the creation floor bounds it
     addDays(startOfDay(today), 1),   // `to` is ALWAYS tomorrow's midnight
@@ -89,7 +90,7 @@ export function HabitFlyout({
           <HabitHeatmap
             schedule={schedule}
             polarity={polarity}
-            createdAt={new Date(habit.created_at)}
+            createdAt={createdAt}
             loggedDays={loggedDays}
             today={today}
             onToggleDate={onToggleDate}
