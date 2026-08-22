@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Search, ChevronDown, Check, X } from "lucide-react";
 import { StatusPill } from "@/components/app/StatusPill";
+import { type PillType } from "@/lib/constants";
 
 export function SearchPill({
   value,
@@ -41,7 +42,7 @@ export function FilterPill({
   options: { value: string; label: string }[];
   selected: string[];
   onChange: (value: string[]) => void;
-  pillType?: "status" | "area" | "priority";
+  pillType?: PillType;
   autoExclude?: string[];
   onRemoveAutoExclude?: (value: string) => void;
   onSelectAll?: () => void;

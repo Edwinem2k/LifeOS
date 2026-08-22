@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { EditableCell } from "./EditableCell";
+import { type PillType } from "@/lib/constants";
 
 export type FieldConfig = {
   key: string;
@@ -12,7 +13,7 @@ export type FieldConfig = {
   section?: string;
   placeholder?: string;
   displayAs?: "pill";
-  pillType?: "status" | "area" | "priority";
+  pillType?: PillType;
   searchable?: boolean;
   /** Select only: lets the user commit a value not already in `options`. */
   creatable?: boolean;
@@ -36,9 +37,10 @@ type Props = {
   onSave: (field: string, value: string) => Promise<void>;
   onClose: () => void;
   autoFocusTitle?: boolean;
+  children?: React.ReactNode;
 };
 
-export function FlyoutPanel({ title, titleField = "name", fields, data, stats, onSave, onClose, autoFocusTitle = false }: Props) {
+export function FlyoutPanel({ title, titleField = "name", fields, data, stats, onSave, onClose, autoFocusTitle = false, children }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -182,6 +184,8 @@ export function FlyoutPanel({ title, titleField = "name", fields, data, stats, o
             </div>
           ))}
         </div>
+
+        {children}
       </div>
     </>
   );

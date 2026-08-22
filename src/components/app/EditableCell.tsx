@@ -5,6 +5,7 @@ import { toast } from "@/components/app/Toast";
 import { StatusPill } from "@/components/app/StatusPill";
 import { DatePicker } from "@/components/app/DatePicker";
 import { Search, Plus } from "lucide-react";
+import { type PillType } from "@/lib/constants";
 
 type Props = {
   value: string;
@@ -12,7 +13,7 @@ type Props = {
   type?: "text" | "textarea" | "select" | "date" | "number";
   options?: { value: string; label: string }[];
   displayAs?: "pill";
-  pillType?: "status" | "area" | "priority";
+  pillType?: PillType;
   placeholder?: string;
   className?: string;
   showEmptyBox?: boolean;
@@ -63,9 +64,10 @@ export function EditableCell({
   useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus();
-      // autoFocus is only ever set on a row that was just created, whose value is a
-      // placeholder like "New item". Selecting it means the first keystroke replaces
-      // the placeholder instead of appending to it.
+      // Select only when we opened in edit mode ourselves (autoFocus), which
+      // happens for a just-created entity whose name is a placeholder like
+      // "New habit" or "New item" — typing should replace it, not append to it.
+      // A cell the user clicked into deliberately keeps the caret where they put it.
       if (autoFocus) inputRef.current.select();
     }
   }, [editing, autoFocus]);

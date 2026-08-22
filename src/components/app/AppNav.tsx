@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, FolderKanban, CheckSquare, Target, MoreHorizontal, List } from "lucide-react";
+import { Home, FolderKanban, CheckSquare, Target, Repeat, MoreHorizontal, List } from "lucide-react";
 import { Logo } from "./Logo";
 import { NavDropdown, type DropdownItem } from "./NavDropdown";
 import { ListIcon } from "./ListIcon";
@@ -13,6 +13,7 @@ const navItems = [
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/goals", label: "Goals", icon: Target },
+  { href: "/habits", label: "Habits", icon: Repeat },
 ];
 
 export function AppNav() {

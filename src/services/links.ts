@@ -112,7 +112,7 @@ export async function getGoalForEntity(entityType: string, entityId: string) {
   if (!kr?.parent_goal_id) return null;
   const { data: goal, error: goalError } = await supabase
     .from("goals")
-    .select("id, title")
+    .select("id, title, area, horizon")
     .eq("id", kr.parent_goal_id)
     .single();
   if (goalError) throw goalError;

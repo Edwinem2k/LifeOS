@@ -28,6 +28,7 @@ export function useLinkKR() {
       qc.invalidateQueries({ queryKey: ["area-progress"] });
       qc.invalidateQueries({ queryKey: ["links"] });
       qc.invalidateQueries({ queryKey: ["key-results"] });
+      qc.invalidateQueries({ queryKey: ["goal-for-habit"] });
     },
   });
 }
@@ -42,6 +43,7 @@ export function useUnlinkKR() {
       qc.invalidateQueries({ queryKey: ["area-progress"] });
       qc.invalidateQueries({ queryKey: ["links"] });
       qc.invalidateQueries({ queryKey: ["key-results"] });
+      qc.invalidateQueries({ queryKey: ["goal-for-habit"] });
     },
   });
 }

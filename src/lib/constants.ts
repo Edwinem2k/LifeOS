@@ -103,8 +103,42 @@ export function formatLabel(value: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function getPillColor(value: string, type: "status" | "area" | "priority"): string {
+export const HABIT_POLARITIES = [
+  { value: "build", label: "Build" },
+  { value: "break", label: "Break" },
+] as const;
+
+export const HABIT_METRICS = [
+  { value: "boolean", label: "Boolean" },
+  { value: "count", label: "Count" },
+  { value: "duration", label: "Duration" },
+] as const;
+
+const POLARITY_COLORS: Record<string, string> = {
+  build: "var(--color-accent-success)",
+  break: "var(--color-accent-danger)",
+};
+
+const METRIC_COLORS: Record<string, string> = {
+  boolean: "var(--color-accent-info)",
+  count: "var(--color-accent-warning)",
+  duration: "var(--color-accent-info)",
+};
+
+export function getPolarityColor(value: string): string {
+  return POLARITY_COLORS[value] ?? "var(--color-text-muted)";
+}
+
+export function getMetricColor(value: string): string {
+  return METRIC_COLORS[value] ?? "var(--color-text-muted)";
+}
+
+export type PillType = "status" | "area" | "priority" | "polarity" | "metric";
+
+export function getPillColor(value: string, type: PillType): string {
   if (type === "area") return getAreaColor(value);
   if (type === "priority") return getPriorityColor(value);
+  if (type === "polarity") return getPolarityColor(value);
+  if (type === "metric") return getMetricColor(value);
   return getStatusColor(value);
 }

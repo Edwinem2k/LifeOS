@@ -4,6 +4,7 @@ import { useToday } from "@/hooks/use-today";
 import { useCompleteTask } from "@/hooks/use-tasks";
 import { useLogHabit } from "@/hooks/use-habits";
 import { StatusPill } from "@/components/app/StatusPill";
+import { isRequiredOn } from "@/lib/habit-stats";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -26,7 +27,17 @@ export default function TodayPage() {
   const logHabit = useLogHabit();
 
   const tasks = agenda?.filter((item: any) => item.item_type === "task") ?? [];
-  const habits = agenda?.filter((item: any) => item.item_type === "habit") ?? [];
+  // `today_agenda` emits every active habit and delegates the schedule filter
+  // to the client (002_views.sql:416). `today` is deliberately not memoized:
+  // pinning it to mount would keep a tab left open overnight showing Monday's
+  // habits, since it refetches on focus (staleTime 30s + refetchOnWindowFocus).
+  const today = new Date();
+  const habits =
+    agenda?.filter(
+      (item: any) =>
+        item.item_type === "habit" &&
+        isRequiredOn(item.item_details?.schedule, today)
+    ) ?? [];
   const events = agenda?.filter((item: any) => item.item_type === "event") ?? [];
 
   const tasksDue = tasks.length;
@@ -98,7 +109,7 @@ export default function TodayPage() {
                     className="flex items-center gap-3 py-2 px-3 rounded-sm hover:bg-card"
                   >
                     <button
-                      onClick={() => logHabit.mutate(habit.item_id)}
+                      onClick={() => logHabit.mutate({ habitId: habit.item_id })}
                       className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-semibold transition-colors ${
                         habit.item_details?.logged_today
                           ? "border-accent-success bg-accent-success text-white"
