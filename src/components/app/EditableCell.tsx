@@ -50,8 +50,13 @@ export function EditableCell({
   useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus();
+      // Select only when we opened in edit mode ourselves (autoFocus), which
+      // happens for a just-created entity whose name is a placeholder like
+      // "New habit" — typing should replace it, not append to it. A cell the
+      // user clicked into deliberately keeps the caret where they put it.
+      if (autoFocus) inputRef.current.select();
     }
-  }, [editing]);
+  }, [editing, autoFocus]);
 
   useEffect(() => {
     if (!dropdownOpen) return;
