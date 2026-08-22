@@ -7,3 +7,6 @@ supabase/.branches/
 dist/
 .next/
 .superpowers/
+
+# TypeScript incremental build cache — never commit
+tsconfig.tsbuildinfo
