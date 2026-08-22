@@ -4,6 +4,7 @@ import { useToday } from "@/hooks/use-today";
 import { useCompleteTask } from "@/hooks/use-tasks";
 import { useLogHabit } from "@/hooks/use-habits";
 import { StatusPill } from "@/components/app/StatusPill";
+import { isRequiredOn } from "@/lib/habit-stats";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -26,7 +27,11 @@ export default function TodayPage() {
   const logHabit = useLogHabit();
 
   const tasks = agenda?.filter((item: any) => item.item_type === "task") ?? [];
-  const habits = agenda?.filter((item: any) => item.item_type === "habit") ?? [];
+  const today = new Date();
+  const habits =
+    agenda
+      ?.filter((item: any) => item.item_type === "habit")
+      .filter((item: any) => isRequiredOn(item.item_details?.schedule, today)) ?? [];
   const events = agenda?.filter((item: any) => item.item_type === "event") ?? [];
 
   const tasksDue = tasks.length;
