@@ -3039,7 +3039,7 @@ npm run build     # succeeds
 # ignore `mcp/`, so it lints the MCP package's compiled dist/ output. That is a
 # pre-existing condition that arrived with the MCP merge and is not this work's
 # to fix; a whole-repo gate would be meaningless here.
-npx eslint src/lib/habit-stats.ts src/lib/habit-stats.test.ts            src/services/habits.ts src/hooks/use-habits.ts            src/components/app/HabitRow.tsx src/components/app/HabitFlyout.tsx            src/components/app/HabitHeatmap.tsx src/components/app/SchedulePicker.tsx            "src/app/(app)/habits/page.tsx" "src/app/(app)/page.tsx"
+npx eslint src/lib/habit-stats.ts src/lib/habit-stats.test.ts            src/services/habits.ts src/hooks/use-habits.ts            src/components/app/HabitRow.tsx src/components/app/HabitFlyout.tsx            src/components/app/HabitHeatmap.tsx src/components/app/SchedulePicker.tsx            "src/app/(app)/habits/page.tsx" "src/app/(app)/page.tsx"            "src/app/(app)/goals/page.tsx"
 ```
 
 **`src/app/(app)/page.tsx` added to the scoped command on 22 Aug.** Task 18 modifies this
@@ -3049,15 +3049,28 @@ briefly pushed this file's `no-explicit-any` count from 7 to 8 before being coll
 predicate; see Task 18's amendment note). Recorded here rather than left as a silent gap so
 the next task doesn't reintroduce it.
 
-**Expected lint baseline for the scoped command: 25 problems (23 errors, 2 warnings).**
-Measured on 22 Aug with Tasks 1-18 landed — 22 `no-explicit-any`, 1 `set-state-in-effect`,
-2 `exhaustive-deps`. The gate's job is to catch *new* rule violations,
-not to reach zero — so compare the composition, not just the count.
+**`src/app/(app)/goals/page.tsx` added to the scoped command on 22 Aug** — the SAME gap,
+one task later. Task 19 modifies this file and the command still didn't cover it, so Task 19
+would have shipped with zero lint coverage exactly as Task 18 nearly did. Caught during
+Task 20's own final checks rather than by a reviewer this time. The pattern is worth naming:
+**adding the file a task touches to the gate is part of that task, not an afterthought** —
+twice now the gate has silently excluded the file under active edit.
+
+**Expected lint baseline for the scoped command: 63 problems (55 errors, 8 warnings).**
+Measured on 22 Aug with Tasks 1-19 landed — 53 `no-explicit-any`, 6 `no-unused-vars`,
+2 `set-state-in-effect`, 2 `exhaustive-deps`. The gate's job is to catch *new* rule
+violations, not to reach zero — so compare the composition, not just the count.
+
+Without `goals/page.tsx` the gate reads 25 (23 errors, 2 warnings); that file contributes
+38 (31 `no-explicit-any`, 6 `no-unused-vars`, 1 `set-state-in-effect`). Task 19 raised its
+`no-explicit-any` from 26 to 31, all five being plan-prescribed `(l: any)` / `(h: any)`
+callbacks in Steps 4-5.
 
 | Rule | Count | Why it is accepted |
 |---|---|---|
-| `@typescript-eslint/no-explicit-any` | 22 | `src/lib/types.ts` is literally `export type Database = any`, so there are no generated Supabase row types to reference. The same rule fires in `DataTable.tsx` (×4), `FlyoutPanel.tsx` and `EditableCell.tsx`. 7 of the 22 are in `src/app/(app)/page.tsx` alone (pre-existing, unrelated to Task 18's edit — Task 18's own edit reuses an existing `(item: any) =>` callback rather than adding one, so it contributes zero net-new). Typing these properly means generating Supabase types — a separate piece of work, now in the Deferred table. |
-| `react-hooks/set-state-in-effect` | 1 | `SchedulePicker`'s re-sync effect. `NotePopover:17` has the same, and it is the pattern this component was told to mirror. |
+| `@typescript-eslint/no-explicit-any` | 53 | `src/lib/types.ts` is literally `export type Database = any`, so there are no generated Supabase row types to reference. The same rule fires in `DataTable.tsx` (×4), `FlyoutPanel.tsx` and `EditableCell.tsx`. 31 of the 53 are in `goals/page.tsx` and 7 in `src/app/(app)/page.tsx` (pre-existing, unrelated to Task 18's edit — Task 18's own edit reuses an existing `(item: any) =>` callback rather than adding one, so it contributes zero net-new). Typing these properly means generating Supabase types — a separate piece of work, now in the Deferred table. |
+| `@typescript-eslint/no-unused-vars` | 6 | All in `goals/page.tsx`, all pre-existing at `bb758df` (verified). `ArrowRight`, `Link2`, `FilterBar`, `keyResultsData`, `prog` — and `unlinkKR`, which is the mutation for an unlink affordance that was started and abandoned. `Link2` is its icon. Together they are the clearest evidence the missing unlink is dropped work rather than an oversight; see the follow-up note under Task 19. |
+| `react-hooks/set-state-in-effect` | 2 | `SchedulePicker`'s re-sync effect, and one pre-existing in `goals/page.tsx:125`. `NotePopover:17` has the same, and it is the pattern `SchedulePicker` was told to mirror. |
 | `react-hooks/exhaustive-deps` on `open` | 1 | Deliberate. Adding `open` to the deps re-runs the effect on every open/close and defeats the guard that stops a background refetch wiping an edit in progress. |
 | `react-hooks/exhaustive-deps` on `commit` | 1 | Same shape as `NotePopover:29`'s missing `handleSave`. |
 
